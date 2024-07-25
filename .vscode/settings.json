@@ -1,0 +1,6 @@
+{
+    "CodeGPT.apiKey": "OpenAI",
+    "CodeGPT.Autocomplete.maxTokens": 128,
+    "CodeGPT.Autocomplete.suggestionDelay": 600,
+    "CodeGPT.Autocomplete.enabled": true
+}
