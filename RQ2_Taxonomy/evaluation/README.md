@@ -23,10 +23,11 @@ To guide your classification task, we have associated each Relevant Information 
 
 You will find the following files in this repository:
 
-- `sampled_sentences_for_annotation.xlsx`: An Excel file containing the 100 sampled sentences. The file has three columns:
-  - `Index`: A unique index from 1 to 100 for reference.
-  - `Sentence`: The text of the sentence to be annotated.
-  - `RI_Category`: A blank column where you will enter the relevant RI category (or categories, separated by commas) for each sentence.
+- `post_sentences.xlsx`: An Excel file containing the 100 sampled sentences. The file has three columns:
+  - `index`: A unique index from 0 to 99 for reference.
+  - `sentence_id`: A unique index for each sentence.
+  - `sentence`: The text of the sentence to be annotated.
+  - `RI_category`: A blank column where you will enter the relevant RI category (or categories, separated by commas) for each sentence.
 
 - `RI_definitions.pdf`: A PDF file containing the detailed definitions of each RI category and the associated Developer Need (DN) classes.
 
@@ -36,12 +37,12 @@ You will find the following files in this repository:
    - Carefully read the `RI_definitions.pdf` document to understand the criteria for each RI category and its associated Developer Need (DN) class.
 
 2. **Classify Sentences**:
-   - Open the `sampled_sentences_for_annotation.xlsx` file.
+   - Open the `post_sentences.xlsx` file.
    - For each sentence, determine whether it belongs to one or more RI categories.
    - Enter the relevant RI category (or categories) in the `RI_Category` column. If the sentence is not relevant to any Developer Need, leave the `RI_Category` column blank.
 
 3. **Save Your Work**:
-   - Save your annotated Excel file as `annotatorX_sampled_sentences.xlsx` (replace `X` with your annotator ID).
+   - Save your annotated Excel file as `post_sentences_annotatorX.xlsx` (replace `X` with your annotator ID).
 
 4. **Submit Your Annotations**:
    - Once you have completed the classification, upload your annotated Excel file to the repository or send it to the study coordinator via email.
@@ -50,14 +51,16 @@ You will find the following files in this repository:
 
 Here is an example of how to annotate the sentences:
 
-| Index | Sentence                                            | RI_Category  |
-|-------|-----------------------------------------------------|--------------|
-| 1     | I am having an issue with my GitHub Actions.        | RI1          |
-| 2     | The workflow fails when trying to build.            | RI3          |
-| 3     | Can someone help me with this?                      |              |
-| 4     | I need to migrate my CI/CD pipeline.                | RI2          |
-| 5     | The deployment step is causing errors.              | RI4, RI1     |
-| 6     | Any recommendations for solving this problem?       | RI5          |
+| index | sentence_id | sentence                                            | RI_category  |
+|-------|-------------|-----------------------------------------------------|--------------|
+| 0     | 2755        | Any recommendations for solving this problem?       | RI5          |
+| 1     | 677         | I am having an issue with my GitHub Actions.        | RI1          |
+| 2     | 1363        | The workflow fails when trying to build.            | RI3          |
+| 3     | 1281        | Can someone help me with this?                      |              |
+| 4     | 961         | I need to migrate my CI/CD pipeline.                | RI2          |
+| 5     | 2755        | The deployment step is causing errors.              | RI4, RI1     |
+
+
 
 ### Post-Annotation Questionnaire
 
