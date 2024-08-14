@@ -55,8 +55,8 @@ Here is an example of how to annotate the sentences:
 |-------|-------------|-----------------------------------------------------|--------------|
 | 0     | 2755        | Any recommendations for solving this problem?       | RI5          |
 | 1     | 677         | I am having an issue with my GitHub Actions.        | RI1          |
-| 2     | 1363        | The workflow fails when trying to build.            | RI3          |
-| 3     | 1281        | Can someone help me with this?                      |              |
+| 2     | 1363        | The workflow fails when trying to build.            |              |
+| 3     | 1281        | Can someone help me with this?                      | RI3          |
 | 4     | 961         | I need to migrate my CI/CD pipeline.                | RI2          |
 | 5     | 2755        | The deployment step is causing errors.              | RI4, RI1     |
 
