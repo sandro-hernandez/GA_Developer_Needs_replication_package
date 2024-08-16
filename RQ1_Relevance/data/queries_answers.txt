@@ -1,0 +1,100 @@
+1. Query for 2019 to 2021
+
+SELECT 
+    q.Id AS [QuestionId],
+    q.Title AS [QuestionTitle],
+    q.CreationDate AS [QuestionCreationDate],
+    t.TagName,
+    a.Id AS [AnswerId],
+    a.CreationDate AS [AnswerCreationDate],
+    a.Score AS [AnswerScore],
+    CASE WHEN q.AcceptedAnswerId = a.Id THEN 1 ELSE 0 END AS [IsAcceptedAnswer],
+    LEN(a.Body) AS [AnswerLength],
+    u.DisplayName AS [AnswerAuthorName],
+    u.Reputation AS [AnswerAuthorReputation],
+    DATEDIFF(MINUTE, q.CreationDate, a.CreationDate) AS [TimeToFirstAnswer]
+FROM 
+    Posts q
+INNER JOIN 
+    PostTags pt ON q.Id = pt.PostId
+INNER JOIN 
+    Tags t ON pt.TagId = t.Id
+LEFT JOIN 
+    Posts a ON a.ParentId = q.Id AND a.PostTypeId = 2
+LEFT JOIN 
+    Users u ON a.OwnerUserId = u.Id
+WHERE 
+    q.PostTypeId = 1  -- Select only questions
+    AND t.TagName IN ('github-actions', 'jenkins', 'gitlab-ci', 'azure-devops', 'travis-ci', 'circleci')
+    AND q.CreationDate >= '2019-01-01' AND q.CreationDate < '2021-01-01'
+ORDER BY 
+    q.CreationDate, a.CreationDate;
+
+
+2. Query for 2021 to 2022
+
+
+SELECT 
+    q.Id AS [QuestionId],
+    q.Title AS [QuestionTitle],
+    q.CreationDate AS [QuestionCreationDate],
+    t.TagName,
+    a.Id AS [AnswerId],
+    a.CreationDate AS [AnswerCreationDate],
+    a.Score AS [AnswerScore],
+    CASE WHEN q.AcceptedAnswerId = a.Id THEN 1 ELSE 0 END AS [IsAcceptedAnswer],
+    LEN(a.Body) AS [AnswerLength],
+    u.DisplayName AS [AnswerAuthorName],
+    u.Reputation AS [AnswerAuthorReputation],
+    DATEDIFF(MINUTE, q.CreationDate, a.CreationDate) AS [TimeToFirstAnswer]
+FROM 
+    Posts q
+INNER JOIN 
+    PostTags pt ON q.Id = pt.PostId
+INNER JOIN 
+    Tags t ON pt.TagId = t.Id
+LEFT JOIN 
+    Posts a ON a.ParentId = q.Id AND a.PostTypeId = 2
+LEFT JOIN 
+    Users u ON a.OwnerUserId = u.Id
+WHERE 
+    q.PostTypeId = 1  -- Select only questions
+    AND t.TagName IN ('github-actions', 'jenkins', 'gitlab-ci', 'azure-devops', 'travis-ci', 'circleci')
+    AND q.CreationDate >= '2021-01-01' AND q.CreationDate < '2022-01-01'
+ORDER BY 
+    q.CreationDate, a.CreationDate;
+
+
+
+3. Query for 2022 to Present
+
+
+SELECT 
+    q.Id AS [QuestionId],
+    q.Title AS [QuestionTitle],
+    q.CreationDate AS [QuestionCreationDate],
+    t.TagName,
+    a.Id AS [AnswerId],
+    a.CreationDate AS [AnswerCreationDate],
+    a.Score AS [AnswerScore],
+    CASE WHEN q.AcceptedAnswerId = a.Id THEN 1 ELSE 0 END AS [IsAcceptedAnswer],
+    LEN(a.Body) AS [AnswerLength],
+    u.DisplayName AS [AnswerAuthorName],
+    u.Reputation AS [AnswerAuthorReputation],
+    DATEDIFF(MINUTE, q.CreationDate, a.CreationDate) AS [TimeToFirstAnswer]
+FROM 
+    Posts q
+INNER JOIN 
+    PostTags pt ON q.Id = pt.PostId
+INNER JOIN 
+    Tags t ON pt.TagId = t.Id
+LEFT JOIN 
+    Posts a ON a.ParentId = q.Id AND a.PostTypeId = 2
+LEFT JOIN 
+    Users u ON a.OwnerUserId = u.Id
+WHERE 
+    q.PostTypeId = 1  -- Select only questions
+    AND t.TagName IN ('github-actions', 'jenkins', 'gitlab-ci', 'azure-devops', 'travis-ci', 'circleci')
+    AND q.CreationDate >= '2022-01-01'
+ORDER BY 
+    q.CreationDate, a.CreationDate;
