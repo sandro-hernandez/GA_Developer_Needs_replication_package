@@ -12,7 +12,17 @@ After the annotation process, you'll be asked to complete a brief questionnaire 
 
 ### Goal
 
-You will receive 100 sentences extracted from Stack Overflow posts. Your task is to classify each sentence into one or more of the predefined RI categories using the provided definitions. If a sentence does not fit any Developer Need, leave the RI category column blank.
+You will receive three different sets of 20 sentences, each focusing on a specific set of DN classes. Your task is to classify each sentence into one or more of the predefined RI categories using the provided definitions. If a sentence does not fit any Developer Need, leave the RI category column blank.
+
+### Classification Stages
+
+Given the complexity and size of the RI categories, the classification task has been divided into three stages, each with a different set of 20 sentences:
+
+- **Stage 1**: Focus on the DN classes that are not EH or OR. This includes the `IN`, `II`, `MI`, `FI`, `AS`, and `LE` categories. You will classify a set of 20 sentences that may belong to these classes.
+  
+- **Stage 2**: Focus exclusively on the `EH` class (`EH1` to `EH9`). This stage involves a different set of 20 sentences related to the EH class.
+
+- **Stage 3**: Focus on the `OR` class (`OR1` to `OR5`). This stage involves another set of 20 sentences related to the OR class.
 
 ### Relevant Information (RI) and Developer Need (DN) Categories
 
@@ -24,11 +34,15 @@ To guide your classification task, we have associated each **Relevant Informatio
 
 You will find the following files in this repository:
 
-- **`post_sentences.xlsx`**: An Excel file containing the 100 sampled sentences. The file has four columns:
-  - `index`: A unique index from 0 to 99 for reference.
+- **`post_sentences_stage1.xlsx`**: An Excel file containing the first set of 20 sentences for Stage 1. The file has four columns:
+  - `index`: A unique index from 0 to 19 for reference.
   - `sentence_id`: A unique index for each sentence.
   - `sentence`: The text of the sentence to be annotated.
   - `RI_category`: A blank column where you will enter the relevant RI category (or categories, separated by commas) for each sentence.
+
+- **`post_sentences_stage2.xlsx`**: An Excel file containing the second set of 20 sentences for Stage 2, focusing on the EH class.
+
+- **`post_sentences_stage3.xlsx`**: An Excel file containing the third set of 20 sentences for Stage 3, focusing on the OR class.
 
 - **`RI_definitions.pdf`**: A PDF file containing the detailed definitions of each RI category and the associated Developer Need (DN) classes.
 
@@ -37,16 +51,17 @@ You will find the following files in this repository:
 1. **Start by Reading the RI and DN Definitions**:
    - Carefully read the `RI_definitions.pdf` document to understand the criteria for each RI category and its associated Developer Need (DN) class.
 
-2. **Classify Sentences**:
-   - Open the `post_sentences.xlsx` file.
+2. **Classify Sentences in Each Stage**:
+   - Start with the `post_sentences_stage1.xlsx` file for Stage 1.
    - For each sentence, determine whether it belongs to one or more RI categories.
    - Enter the relevant RI category (or categories) in the `RI_Category` column. If a sentence does not fit any Developer Need, leave the `RI_Category` column blank.
+   - Repeat this process for `post_sentences_stage2.xlsx` and `post_sentences_stage3.xlsx` for Stages 2 and 3, respectively.
 
 3. **Save Your Work**:
-   - Save your annotated Excel file as `post_sentences_annotatorX.xlsx` (replace `X` with your annotator ID).
+   - Save your annotated Excel file as `post_sentences_stageX_annotatorY.xlsx` (replace `X` with the stage number and `Y` with your annotator ID).
 
 4. **Submit Your Annotations**:
-   - Once you have completed the classification, upload your annotated Excel file to the repository or send it to the study coordinator via email.
+   - Once you have completed the classification for all stages, upload your annotated Excel files to the repository or send them to the study coordinator via email.
 
 ### Example
 
@@ -65,7 +80,7 @@ Here is an example of how to annotate the sentences:
 
 ### Post-Annotation Questionnaire
 
-After completing the annotation process, you'll complete a short questionnaire to evaluate the ease of use of the classification task and share any additional insights you may have.
+After completing the annotation process for all three stages, you'll complete a short questionnaire to evaluate the ease of use of the classification task and share any additional insights you may have.
 
 ### Notes
 
