@@ -1,0 +1,17 @@
+
+    SELECT 
+        p.Id AS [AnswerId],
+        p.ParentId AS [QuestionId],
+        p.CreationDate AS [AnswerCreationDate],
+        p.Score AS [AnswerScore],
+        p.Body AS [AnswerBody],
+        p.OwnerUserId AS [AnswerAuthorId],
+        p.OwnerDisplayName AS [AnswerAuthorName]
+    FROM 
+        Posts p
+    WHERE 
+        p.PostTypeId = 2  -- Answer posts
+        AND p.ParentId IN (60176044,61208421,61828726,62373897,63691962,64078671,64721253,65205928,72375995,73327325,76151656,77116717)
+    ORDER BY 
+        p.ParentId, p.CreationDate;
+    

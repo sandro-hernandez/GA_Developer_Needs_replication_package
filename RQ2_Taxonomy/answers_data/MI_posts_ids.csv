@@ -1,0 +1,459 @@
+AnswerId,QuestionId,AnswerCreationDate,AnswerScore,AnswerBody,AnswerAuthorId,AnswerAuthorName
+"60826105","60176044","2020-03-24 06:46:48","-4","<p>You need to define your environment variables in ""Secrets"" section of your repository. Then you can simply use your secrets in your workflow.</p>
+
+<p>Example usage:</p>
+
+<pre><code>- uses: some-action@v1
+  env:
+    API_KEY: ${{ secrets.API_KEY }}
+    SECRET_ID: ${{ secrets.SECRET_ID }}
+  with:
+    password: ${{ secrets.MY_PASSWORD }}
+
+</code></pre>
+
+<p>Here is the documentation:</p>
+
+<p><a href=""https://help.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets"" rel=""nofollow noreferrer"">https://help.github.com/en/actions/configuring-and-managing-workflows/creating-and-storing-encrypted-secrets</a></p>
+","470214",""
+"61734454","60176044","2020-05-11 16:24:06","10","<p>Edit:
+You were using Circleci Contexts, so with that you had a set of secrets of each env. I know they are working to bring secrets to org level, and maybe team level... there is no info if they will create sort of contexts like we have in CCI.</p>
+
+<p>I have thought on adding the env as prefix of the secret name like STAGE_GITHUB_KEY or INTEGRATION_GITHUB_KEY using ${env}_GITHUB_KEY on the yml as a workaround for now... What do you think?</p>
+
+<p>--- Original answer:
+If I understand you well, you already have the dotenv files stored somewhere and you want to inject all those secrets into the steps, without having to manually add them to github secrets and do the mapping in each workflow you migrate... right?</p>
+
+<p>There is an action made by someone that reads a dotenv file and put its values into ouputs, so you can use them linked in further steps. Here is the link: <a href=""https://github.com/marketplace/actions/dotenv-action"" rel=""noreferrer"">https://github.com/marketplace/actions/dotenv-action</a></p>
+
+<p>Whatever is present in the .env file will be converted into an output variable. For example .env file with content:</p>
+
+<pre><code>VERSION=1.0
+AUTHOR=Mickey Mouse
+</code></pre>
+
+<p>You do:</p>
+
+<pre><code>id: dotenv
+uses: ./.github/actions/dotenv-action
+</code></pre>
+
+<p>Then later you can refer to the alpine version like this ${{ steps.dotenv.outputs.version }}</p>
+","7358206",""
+"63350136","60176044","2020-08-11 01:13:32","231","<p>A quick solution here could be having a step to manually create the <code>.env</code> file before you need it.</p>
+<pre><code>      - name: 'Create env file'
+        run: |
+          touch .env
+          echo API_ENDPOINT=&quot;https://xxx.execute-api.us-west-2.amazonaws.com&quot; &gt;&gt; .env
+          echo API_KEY=${{ secrets.API_KEY }} &gt;&gt; .env
+          cat .env
+</code></pre>
+","2444877",""
+"64452700","60176044","2020-10-20 20:13:19","41","<p>The easiest way to do this is to create the .env file as a github secret and then create the .env file in your action.<br />
+So step 1 is to create the .env files as a secret in github as a base64 encoded string:<br>
+<code>openssl base64 -A -in qa.env -out qa.txt</code><br>
+or<br>
+<code>cat qa.env | base64 -w 0 &gt; qa.txt</code><br>
+Then in you action, you can do something like</p>
+<pre><code>- name: Do Something with env files
+  env:
+    QA_ENV_FILE: ${{ secrets.QA_ENV_FILE }}
+    PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+  run: |
+    [ &quot;$YOUR_ENVIRONMENT&quot; = qa ] &amp;&amp; echo $QA_ENV_FILE | base64 --decode &gt; .env
+    [ &quot;$YOUR_ENVIRONMENT&quot; = prod ] &amp;&amp; echo $PROD_ENV_FILE | base64 --decode &gt; .env
+</code></pre>
+<p>There are a number of ways for determining <code>$YOUR_ENVIRONMENT</code> but usually this can be extracted from the <code>GITHUB_REF</code> object.  You applications should be able to read from the .env files as needed.</p>
+","6895064",""
+"65899220","60176044","2021-01-26 10:01:39","4","<p>Another alternative is to use the <a href=""https://docs.github.com/en/actions/reference/environments"" rel=""nofollow noreferrer"">Environments</a> feature from github. Although that isn't available on private repos in the free plan.
+You could have scoped variables, at repository, profile/organization level and environment. The configuration variables closer to the repository takes precedence over the others.</p>
+","3746240",""
+"67543246","60176044","2021-05-15 04:24:30","43","<p>I would suggest 3 pretty simple ways to engage your <code>.env</code> file variables in the GitHub Actions workflow. They differ based on whether you store the file in your repository (the worst practice) or keep it out of it (the best practice).</p>
+<ol>
+<li><p>You keep your <code>.env</code> file in the repository:</p>
+<ul>
+<li>There are some <a href=""https://duckduckgo.com/?q=github+actions+dotenv&amp;atb=v242-1&amp;ia=web&amp;iai=r1-1&amp;page=1&amp;sexp=%7B%22biaexp%22%3A%22b%22%2C%22msvrtexp%22%3A%22b%22%2C%22earlydeep%22%3A%22a%22%7D"" rel=""nofollow noreferrer"">ready-made actions</a> that allow to read the <code>.env</code> variables (e.g. <a href=""https://github.com/marketplace/actions/dotenv-action"" rel=""nofollow noreferrer"">Dotenv Action</a>,<a href=""https://github.com/marketplace/actions/simple-dotenv"" rel=""nofollow noreferrer"">Simple Dotenv</a>).</li>
+</ul>
+</li>
+<li><p>(<em>simple, manual, annoying when update <code>.env</code> variables</em>) You keep your file out of your repository (keep there and maintain updated <code>.env.example</code> instead):</p>
+<ul>
+<li><p>You manually copy the content of the respective <code>.env</code>    files (say <code>.env.stage</code>, <code>.env.production</code>) into the respective GitHub Actions <a href=""https://docs.github.com/en/actions/security-guides/encrypted-secrets"" rel=""nofollow noreferrer"">secret variables</a> (say <code>WEBSITE_ENV_STAGE</code>, <code>WEBSITE_ENV_PRODUCTION</code>).</p>
+</li>
+<li><p>Then at your GitHub Actions workflow script create the <code>.env</code> file from the desired variable like this <code>echo &quot;${{secrets.WEBSITE_ENV_STAGE }}&quot; &gt; .env</code> and use it in the workflow.</p>
+</li>
+</ul>
+</li>
+<li><p>(<em>a bit more involved though prepare it once, then change your <code>.env</code> variables at the local machine, then sync these at GitHub with one click</em>) As in item 2 above, the file is out of the repository.</p>
+<ul>
+<li>Now you use the GitHub Actions API to <a href=""https://docs.github.com/en/rest/reference/actions#create-or-update-a-repository-secret"" rel=""nofollow noreferrer"">create or update the secrets</a>. On your local machine in the <code>dev</code> environment you write the NodeJS script that calls the API endpoint and write the <code>.env</code> files to the desired GitHub Actions secret variable (say as above into <code>WEBSITE_ENV_STAGE</code> or to both stage and production variables at once);</li>
+</ul>
+</li>
+</ol>
+<p>This is pretty wide choice of ways to engage the <code>.env</code> files's variables in the workflow. Use any matching your preference and circumstances.</p>
+<p>Just for information, there is the 4th way which engages some 3rd party services like <a href=""https://www.dotenv.org/vault"" rel=""nofollow noreferrer"">Dotenv Vault</a> or <a href=""https://www.vaultproject.io/"" rel=""nofollow noreferrer"">HasiCorp Vault</a> (there are more of the kind) where you keep you secret variables to read these to create <code>.env</code> file at build time with your CI/CD pipeline. Read there for details.</p>
+","6597265",""
+"68975466","60176044","2021-08-29 17:39:29","0","<p>I was having the same issue. What I wanted was to upload a .env file to my server instead of defining the env variables in my Github repo. Since I was not tracking my .env file so every time my workflow ran the .env file got deleted. So what I did was :</p>
+<ol>
+<li>Added the <code>.env</code> file in the project root directory in my server.</li>
+<li>Added <code>clean: false</code> under <code>with</code> key in my <code>actions/checkout@v2</code> in my workflow</li>
+</ol>
+<p>eg:</p>
+<pre><code>jobs:
+  build:
+
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+       
+    - uses: actions/checkout@v2
+      with: 
+        clean: 'false'
+</code></pre>
+<p>This prevents git from deleting untracked files like .env. For more info see: <a href=""https://github.com/actions/checkout"" rel=""nofollow noreferrer"">actions/checkout</a></p>
+","16781183",""
+"71030893","60176044","2022-02-08 08:46:36","13","<p>You can also use a dedicated <code>github action</code> from github-marketplace to create <code>.env</code> files.</p>
+<p>Example usage:</p>
+<pre><code>name: Create envfile
+
+on: [push]
+
+jobs:
+
+  create-envfile:
+ 
+    runs-on: ubuntu-18.04
+ 
+    steps:
+    - name: Make envfile
+      uses: SpicyPizza/create-envfile@v1
+      with:
+        envkey_DEBUG: false
+        envkey_SOME_API_KEY: &quot;123456abcdef&quot;
+        envkey_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        file_name: .env
+</code></pre>
+<p>Depending on your values defined for secrets in github repo, this will create a <code>.env</code> file like below:</p>
+<pre><code>DEBUG: false
+SOME_API_KEY: &quot;123456abcdef&quot;
+SECRET_KEY: password123
+</code></pre>
+<p>More info: <a href=""https://github.com/marketplace/actions/create-env-file"" rel=""noreferrer"">https://github.com/marketplace/actions/create-env-file</a></p>
+","2339586",""
+"71166556","60176044","2022-02-17 23:15:54","3","<p>I tried using the accepted solution but GitHub actions were complaining about the shell commands. I kept getting this error: <code>line 3: unexpected EOF while looking for matching ``'</code></p>
+<p>Instead of referencing the secrets directly in the shell script, I had to pass them in separately.</p>
+<pre><code>  - name: Create env file
+    run: |
+      touch .env
+      echo POSTGRES_USER=${POSTGRES_USER} &gt;&gt; .env
+      echo POSTGRES_PASSWORD=${POSTGRES_PASSWORD} &gt;&gt; .env
+      cat .env
+    env: 
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }} 
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} 
+</code></pre>
+","7776992",""
+"71351918","60176044","2022-03-04 13:08:23","1","<p>One more approach would be doing something as described in <a href=""https://docs.github.com/en/actions/security-guides/encrypted-secrets#limits-for-secrets"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/security-guides/encrypted-secrets#limits-for-secrets</a></p>
+<p>So basically treating your <code>.env</code> file as a &quot;large secret&quot;. In this case, the encrypted <code>.env</code> file is kept commited in your repo, which should be fine. Then in your action have a step to decrypt the <code>.env</code> file.</p>
+<p>This removes the overhead of having to create each individual secret inside your <code>.env</code> as a Github secret. The only Github secret to maintain in this case, is one for the encryption password. If you have multiple <code>.env</code> files such as <code>qa.env</code>, <code>prod.env</code>, etc... I would strongly suggest using a different encryption password for each, and then store each encryption passwords as an &quot;environment secret&quot; in Github instead of &quot;repo secret&quot; (if using Github environments is your thing. See <a href=""https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment</a>).</p>
+<p>If you don't want to commit the (encrypted) <code>.env</code> file in you repo, then I would go with the base64 approach described in <a href=""https://stackoverflow.com/a/64452700/1806782"">https://stackoverflow.com/a/64452700/1806782</a> (which is simmilar to what's in <a href=""https://docs.github.com/en/actions/security-guides/encrypted-secrets#storing-base64-binary-blobs-as-secrets"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/security-guides/encrypted-secrets#storing-base64-binary-blobs-as-secrets</a>) and then create a new Github secret to host the encoded contents.</p>
+<p>For those like me with aversion to manual repetitive tasks, Github secret creation can these days easily be scripted with the Github CLI tool. See
+<a href=""https://cli.github.com/manual/gh_secret_set"" rel=""nofollow noreferrer"">https://cli.github.com/manual/gh_secret_set</a> . It also supports 'batch' creation of secrets from env files (see the <code>-f</code>, <code>--env-file</code> flags)</p>
+","1806782",""
+"72699083","60176044","2022-06-21 10:20:11","6","<p>You can export all secrets to environment variables and do everything from a script.</p>
+<p>I created an action exactly for that - takes all the secrets and exports them to environment variables.</p>
+<p>An example would be:</p>
+<pre><code>- run: echo &quot;Value of MY_SECRET1: $MY_SECRET1&quot;
+  env:
+    MY_SECRET1: ${{ secrets.MY_SECRET1 }}
+    MY_SECRET2: ${{ secrets.MY_SECRET2 }}
+    MY_SECRET3: ${{ secrets.MY_SECRET3 }}
+    MY_SECRET4: ${{ secrets.MY_SECRET4 }}
+    MY_SECRET5: ${{ secrets.MY_SECRET5 }}
+    MY_SECRET6: ${{ secrets.MY_SECRET6 }}
+    ...
+</code></pre>
+<p>You could convert it to:</p>
+<pre><code>- uses: oNaiPs/secrets-to-env-action@v1
+  with:
+    secrets: ${{ toJSON(secrets) }}
+- run: echo &quot;Value of MY_SECRET1: $MY_SECRET1&quot;
+</code></pre>
+<p>Link to the action, which contains more documentation about configuration: <a href=""https://github.com/oNaiPs/secrets-to-env-action"" rel=""noreferrer"">https://github.com/oNaiPs/secrets-to-env-action</a></p>
+","1380301",""
+"73359709","60176044","2022-08-15 10:26:39","0","<p>inspired by <a href=""https://stackoverflow.com/a/67543246/1238150"">Valentine Shis answer above</a>, I created a GitHub Action for this use-case and the one I had at the time while reading this thread.</p>
+<p>GitHub Action: <a href=""https://github.com/marketplace/actions/next-env"" rel=""nofollow noreferrer"">next-env</a></p>
+<blockquote>
+<p>GitHub Action to read .env.[development|test|production][.local] files in Next.js (but also non Next.js) projects and add variables as secrets to GITHUB_ENV.</p>
+</blockquote>
+<p>Despite the name, it also works in non-Next.js projects as it uses a decoupled package of the Next ecosystem.</p>
+","1238150",""
+"77150212","60176044","2023-09-21 12:24:45","3","<p>Btw you can also do <code>gh secret set -f .env</code> if you have the github cli!</p>
+","3105372",""
+"77376038","60176044","2023-10-27 17:27:44","5","<p>The most modern alternative is to use a <code>.env.vault</code> file.</p>
+<p>Here's a <a href=""https://www.dotenv.org/docs/languages/nodejs/github-actions"" rel=""noreferrer"">NodeJS Guide on how to use a <code>.env.vault</code> file with GitHub Actions</a></p>
+<p>It boils down to 3 steps:</p>
+<ol>
+<li>Build your encrypted <code>.env.vault</code> file and commit that safely to code. This contains an encrypted copy of your CI secrets.</li>
+<li>Set a single <code>DOTENV_KEY</code> environment variable on GitHub Actions</li>
+<li>When the CI runs it will use the <code>DOTENV_KEY</code> to decrypt the contents of your <code>.env.vault</code> and inject your environment variables just in time.</li>
+</ol>
+<p>This approach is a little more work to initially set up (familiarizing yourself with the new .env.vault file format), but then it has the following benefits:</p>
+<ul>
+<li>No more scattering your secrets across multiple third parties like GitHub Actions that could leak them someday (like what happened with <a href=""https://techcrunch.com/2023/01/05/circleci-breach/"" rel=""noreferrer"">CircleCi breach</a>)</li>
+<li>You can manage and check your secrets from one central place (rather than having to check GitHub Actions UI to see the value of a secret)</li>
+<li>If you move CIs everything still just works. You just have to set again that single <code>DOTENV_KEY</code>, not a hundred others on the ci server. All your secrets and config are still encrypted inside your <code>.env.vault</code> file which lives safely in your repository.</li>
+<li>An attacker needs access to both your <code>DOTENV_KEY</code> and your <code>.env.vault</code> file to gain access to your secrets/config. So if GitHub Actions ever has a leak of their CI secrets, your secrets will still be safe because the attacker will only have your <code>DOTENV_KEY</code> and not your <code>.env.vault</code> file. This will save you the time and annoyance of having to rotate all your secrets.</li>
+</ul>
+<p>Hope this is useful. Full disclosure: I am the pioneer of <a href=""https://github.com/motdotla/dotenv"" rel=""noreferrer"">dotenv</a> and also run the <a href=""https://dotenv.org"" rel=""noreferrer"">Dotenv.org</a> service. That said, the mechanism to generate your <code>.env.vault</code> file is completely open, local, and free. It's just a file format that uses AES-256 GCM encryption. I wanted the same (or close to) elegance of a .env file but with added security for production and ci deployments. <a href=""https://github.com/dotenv-org/dotenv-vault#how-do-i-use--locally-managed-dotenv-vault"" rel=""noreferrer"">See here for how to use the local only commands</a> or use <a href=""https://dotenv.org"" rel=""noreferrer"">dotenv.org for the hosted solution</a>.</p>
+","18103496",""
+"78142067","60176044","2024-03-11 16:13:37","1","<p>I created a GitHub Action specifically designed for utilizing your environment variables within your .env files, eliminating the need to set up secrets in GitHub project settings. Check it out here: <a href=""https://github.com/zdeneklapes/dotenv-vault-action"" rel=""nofollow noreferrer"">https://github.com/zdeneklapes/dotenv-vault-action</a>.</p>
+<p>It can download the .env file of your choice and will delete all downloaded .env files as a Post Job (after all jobs are completed)!</p>
+<p>You still need to set at least 1 secret, it is your <code>DOTENV_ME</code>.</p>
+<h2>How to load <code>.env</code> variables into the environment?</h2>
+<p>When the <code>.env</code> file is downloaded don't forget to load your environment variables using the command <code>source .env</code>.</p>
+<h4>Example:</h4>
+<pre class=""lang-yaml prettyprint-override""><code>- uses: zdeneklapes/dotenv-vault-action@v1
+        with:
+          dotenvMe: ${{ secrets.DOTENV_ME }}
+          stage: &quot;ci&quot;
+          move: &quot;false&quot;
+- run: |
+    source .env.ci
+    ssh &quot;${SSH_USER}@${SSH_HOST}&quot; &quot;
+    cd ${DIR_SSH_PROJECT_PRODUCTION} || exit
+    docker compose -f docker-compose.prod.yml up --build
+    cd - || exit
+    &quot;
+</code></pre>
+","14471542",""
+"78412095","60176044","2024-05-01 05:06:00","0","<p>Sorry I'm late, but another solution could be to preserve the basic structure of the .env file in your prod branch if you want to avoid setting a large number of variables individually and you want to prevent putting your entire .env content into a single GitHub secret variable.</p>
+<p>Example of your basic .env file located in the prod branch:</p>
+<pre><code>APP_NAME=App
+APP_URL=http://localhost
+APP_ENVIROMENT=local
+APP_DEBUG=true
+DB_DRIVER=mysql
+CACHE_DRIVER=redis
+SESSION_DRIVER=redis
+</code></pre>
+<p>Then only edit the variables that you want to change for prod in your actions workflow.</p>
+<ul>
+<li><p>Remember to add the env variables you want to change to your secrets tab on GitHub for actions.</p>
+<pre><code>- name: 'Update env file for prod'
+  run: |
+    sed -i 's|APP_URL=http://localhost|APP_URL=${{ secrets.APP_URL }}|' .env
+    sed -i 's|APP_ENVIROMENT=local/APP_ENVIROMENT=${{ secrets.APP_ENVIROMENT }}|' .env
+    sed -i 's|APP_DEBUG=true/APP_DEBUG=${{ secrets.APP_DEBUG }}|' .env
+</code></pre>
+</li>
+</ul>
+<p>NOTE: The Linux sed command for editing an .env file has not been tested. You can use your own if it does not work as expected.</p>
+","8773111",""
+"66467894","61828726","2021-03-04 02:50:56","2","<p>What fixed the problem for me is in my YAML workflow, replacing</p>
+<pre><code>runs-on: ubuntu-latest 
+</code></pre>
+<p>with</p>
+<pre><code>runs-on: ubuntu-20.04
+</code></pre>
+<p>ubuntu-latest uses Ubuntu 18.04 and the SQLite version seems to be old and have an issue.</p>
+","464618",""
+"62374408","62373897","2020-06-14 15:13:29","2","<p>You can use the <a href=""https://github.com/marketplace/actions/install-ssh-key"" rel=""nofollow noreferrer"">install SSH key action</a>. Just make sure you’re using a SSH git URL in your <code>Matchfile</code>, not a HTTPS URL.</p>
+","1445366",""
+"63692013","63691962","2020-09-01 16:44:18","0","<p>U need to host an external redis database because containers in GitHub Actions are isolated.
+For other hand u can prepare a docker container with all you need for testing and then u can run the tests inside.</p>
+<p>Un can take a look here <a href=""https://github.com/gonsandia/github-action-deploy"" rel=""nofollow noreferrer"">https://github.com/gonsandia/github-action-deploy</a>
+Its a custom action where u define the dockerfile and the scripts to runs</p>
+","6140038",""
+"63694268","63691962","2020-09-01 19:32:54","2","<p>So I figured out what was the problem.
+Docker network works only if you run your job inside container. And I had not.</p>
+<p>Here is example <a href=""https://github.com/actions/example-services/blob/989ef69ed164330bee413f11ce9332d76f943af7/.github/workflows/mongodb-service.yml#L19"" rel=""nofollow noreferrer"">https://github.com/actions/example-services/blob/989ef69ed164330bee413f11ce9332d76f943af7/.github/workflows/mongodb-service.yml#L19</a></p>
+<p>And a quote:</p>
+<blockquote>
+<p>runs all of the steps inside the specified container rather than on the VM host.
+Because of this the network configuration changes from host based network to a container network.</p>
+</blockquote>
+","3110970",""
+"69397197","64078671","2021-09-30 18:24:04","0","<p>Unfortunately, my solution was not at all tidy. I had to path into the gem installation directory and directly reference the gem executable. Thankfully, the relative path doesn't change, so I could just hardcode it into the test script. Maybe there's a more elegant solution, but once I got it working, I just dropped it.</p>
+<p>And sorry if you're trying to reproduce this, but it was over a year ago and I left the company, so I don't have access to what the path was.</p>
+","630517",""
+"71230969","64078671","2022-02-23 03:13:45","0","<p>Jenkins -&gt; Manage Jenkins -&gt; Configure System -&gt; Global properties -&gt; Environment variables -&gt; Name: LC_ALL, Value: en_US.UTF-8</p>
+","7718603",""
+"73059178","64078671","2022-07-20 23:36:26","1","<ol>
+<li>I was facing the same issue while setting up <code>fastlane</code> to run my Xcode tests.</li>
+<li>Finally, solved the issue by adding PATH in <code>Jenkinsfile</code> as below.</li>
+<li>Note that <code>SampleProject-TestCase-Executions</code> is Sample app on my Desktop.</li>
+<li>Please find <a href=""https://github.com/BudhabhooshanPatil/Jenkin-demo-app"" rel=""nofollow noreferrer"">GitHub Demo App</a> for more info.</li>
+</ol>
+<pre><code>node {
+    stage &quot;Run Fast file&quot;    
+    sh '''
+    cd /Users/bhooshanpatil/Desktop/SampleProject-TestCase-Executions
+    export PATH=&quot;$PATH:/usr/local/bin:/usr/local/bin:/usr/local/sbin$:&quot;
+    fastlane scan
+    '''
+}
+</code></pre>
+","10279508",""
+"64724369","64721253","2020-11-07 04:17:30","21","<p>I went down the road that <a href=""https://stackoverflow.com/users/3266847/benjamin-w"">Benjamin W.</a> was talking about with having <code>VERSION</code> in my environment vs just in that specific step.</p>
+<p>This worked for me to set the variable in one step, then use it in separate steps.</p>
+<pre><code>- name: Set variables
+  run: |
+    VER=$(cat VERSION)
+    echo &quot;VERSION=$VER&quot; &gt;&gt; $GITHUB_ENV
+
+- name: Build Docker Image
+  uses: docker/build-push-action@v2
+  with:
+    context: .
+    file: ${{ env.BASE_DIR }}/Dockerfile
+    load: true
+    tags: |
+      ${{ env.USER }}/${{ env.REPO }}:${{ env.VERSION }}
+      ${{ env.USER }}/${{ env.REPO }}:latest
+</code></pre>
+","10984961",""
+"68092042","64721253","2021-06-23 00:13:37","1","<p>As I want to re-use ENV_VAR between jobs, this is how I do it. I wish I could find a way to minimize this code.</p>
+<p>In this example, I use VARs from my Dockerfile. But it will work from any file.</p>
+<pre><code>  pre_build:
+    runs-on: ubuntu-20.04
+    steps:
+        ...
+      -
+        name: Save variables to disk
+        run: |
+          cat $(echo ${{ env.DOCKERFILE }}) | grep DOCKERHUB_USER= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/DOCKERHUB_USER
+          cat $(echo ${{ env.DOCKERFILE }}) | grep GITHUB_ORG= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/GITHUB_ORG
+          cat $(echo ${{ env.DOCKERFILE }}) | grep GITHUB_REGISTRY= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/GITHUB_REGISTRY
+          echo &quot;$(cat ~/varz/DOCKERHUB_USER)/$(cat ~/varz/APP_NAME)&quot; &gt; ~/varz/DKR_PREFIX
+      - 
+        name: Set ALL variables for this job | à la sauce GitHub Actions
+        run: |
+          echo &quot;VERSION_HASH_DATE=$(cat ~/varz/VERSION_HASH_DATE)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_HASH_ONLY=$(cat ~/varz/VERSION_HASH_ONLY)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_CI=$(cat ~/varz/VERSION_CI)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_BRANCH=$(cat ~/varz/VERSION_BRANCH)&quot; &gt;&gt; $GITHUB_ENV
+      -
+        name: Show variables
+        run: |
+          echo &quot;${{ env.VERSION_HASH_DATE }} &lt; VERSION_HASH_DATE&quot;
+          echo &quot;${{ env.VERSION_HASH_ONLY }} &lt; VERSION_HASH_ONLY&quot;
+          echo &quot;${{ env.VERSION_CI }} &lt; VERSION_CI&quot;
+          echo &quot;${{ env.VERSION_BRANCH }} &lt; VERSION_BRANCH&quot;
+      - 
+        name: Upload variables as artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: variables_on_disk
+          path: ~/varz
+
+  test_build:
+    needs: [pre_build]
+    runs-on: ubuntu-20.04
+    steps:
+       ...
+      - 
+        name: Job preparation | Download variables from artifact
+        uses: actions/download-artifact@master
+        with:
+          name: variables_on_disk
+          path: ~/varz
+      - 
+        name: Job preparation | Set variables for this job | à la sauce GitHub Actions
+        run: |
+          echo &quot;VERSION_HASH_DATE=$(cat ~/varz/VERSION_HASH_DATE)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_HASH_ONLY=$(cat ~/varz/VERSION_HASH_ONLY)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_BRANCH=$(cat ~/varz/VERSION_BRANCH)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;BRANCH_NAME=$(cat ~/varz/BRANCH_NAME)&quot; &gt;&gt; $GITHUB_ENV
+</code></pre>
+","5596289",""
+"65355741","65205928","2020-12-18 10:51:56","1","<p>I've solved my issues and this is an example github workflow for the github actions:</p>
+<pre><code>name: Multiple Environments Example
+
+on: [push, pull_request]
+
+jobs:
+  e2e-test-on-ubuntu-with-local-chrome:
+    runs-on: ubuntu-latest
+    #runs-on: macos-latest
+    #runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup
+        run: npm install
+      - name: Test
+        run: npm run clear-test -- &quot;wdio-configs/wdio.conf.chrome.chromedriver.headless.js --cucumberOpts.tagExpression=@myTests&quot;
+        env:
+          ENV_PATH: environment/QS
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v2
+        with:
+          name: reports
+          path: tests/reports/
+      - name: Upload Logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: logs
+          path: log/
+</code></pre>
+","4062803",""
+"72376471","72375995","2022-05-25 11:05:27","8","<p>If you have a look at the <a href=""https://github.com/actions/checkout"" rel=""noreferrer"">actions/checkout</a> repo, you will notice that by default it fetches only a single commit. You can change this using the <code>fetch-depth</code> parameter:</p>
+<pre><code> - uses: actions/checkout@v3
+   with:
+     fetch-depth: 0
+</code></pre>
+<p>From the checkout's readme:</p>
+<blockquote>
+<p>0 indicates all history for all branches and tags.</p>
+</blockquote>
+","10662240",""
+"73329852","73327325","2022-08-12 06:08:32","1","<p>If you want to create an environment variable, add it to the file behind <code>$GITHUB_ENV</code> like so:</p>
+<pre class=""lang-yaml prettyprint-override""><code>- run: echo &quot;NAME=${{ github.repository }}_$(cat VERSION).zip&quot; &gt;&gt; $GITHUB_ENV
+- run: echo ${{ env. NAME }}
+</code></pre>
+<p>For more information, see the docs on <a href=""https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable"" rel=""nofollow noreferrer"">Workflow commands for GitHub Actions / Setting an environment variable</a></p>
+","1080523",""
+"77130745","77116717","2023-09-18 22:37:35","0","<p>You use can <a href=""https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#sending-values-to-the-pre-and-post-actions"" rel=""nofollow noreferrer""><code>GITHUB_STATE</code></a> or <a href=""https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-environment-variable"" rel=""nofollow noreferrer""><code>GITHUB_ENV</code></a>.</p>
+<p>From the docs:</p>
+<blockquote>
+<p>This example uses JavaScript to write to the GITHUB_STATE file. The resulting environment variable is named STATE_processID with the value of 12345:</p>
+</blockquote>
+<pre class=""lang-js prettyprint-override""><code>import * as fs from 'fs'
+import * as os from 'os'
+
+fs.appendFileSync(process.env.GITHUB_STATE, `processID=12345${os.EOL}`, {
+  encoding: 'utf8'
+})
+</code></pre>
+<p>Or setting an env variable using bash and <code>GITHUB_ENV</code>:</p>
+<pre class=""lang-bash prettyprint-override""><code>echo &quot;{environment_variable_name}={value}&quot; &gt;&gt; &quot;$GITHUB_ENV&quot;
+</code></pre>
+<blockquote>
+<p>You can make an environment variable available to any subsequent steps in a workflow job by defining or updating the environment variable and writing this to the <code>GITHUB_ENV</code> environment file. The step that creates or updates the environment variable does not have access to the new value, but all subsequent steps in a job will have access.</p>
+</blockquote>
+<p>For example:</p>
+<pre class=""lang-yaml prettyprint-override""><code>steps:
+  - name: Set the value
+    id: step_one
+    run: |
+      echo &quot;action_state=yellow&quot; &gt;&gt; &quot;$GITHUB_ENV&quot;
+  - name: Use the value
+    id: step_two
+    run: |
+      printf '%s\n' &quot;$action_state&quot; # This will output 'yellow'
+</code></pre>
+<p>This would be roughly equivalent to GitLab's dotenv report like so:</p>
+<pre class=""lang-yaml prettyprint-override""><code>job_one:
+  script:
+    - echo &quot;action_state=yellow&quot; &gt;&gt; my.env
+  artifacts:
+    reports:
+      dotenv: my.env
+job_two
+  needs: [job_one]
+  script:
+    - echo &quot;${action_state}&quot;  # 'yellow'
+</code></pre>
+","5747944",""

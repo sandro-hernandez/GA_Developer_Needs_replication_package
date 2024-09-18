@@ -1,0 +1,490 @@
+AnswerId,QuestionId,AnswerCreationDate,AnswerScore,AnswerBody,AnswerAuthorId,AnswerAuthorName
+"58636619","58630097","2019-10-31 03:40:17","11","<p>I think you can resolve it by associating <code>master</code> with <code>origin master</code> like this:</p>
+
+<pre><code>git fetch origin master:master
+git diff --name-only master
+</code></pre>
+
+<p>Be aware that events that trigger <code>on: pull_request</code> workflows are not associated with a branch, they are associated with a merge commit SHA. So <code>actions/checkout@v1</code> by default will checkout the merge commit specified by <code>GITHUB_SHA</code>, not the branch that is merging into the base. See the <a href=""https://help.github.com/en/github/automating-your-workflow-with-github-actions/events-that-trigger-workflows#pull-request-event-pull_request"" rel=""noreferrer"">documentation here</a>. </p>
+
+<p>You can override this default behaviour and checkout the branch merging into the base like this:</p>
+
+<pre><code>      - uses: actions/checkout@master
+        with:
+          ref: ${{ github.head_ref }}
+</code></pre>
+
+<p>I'm not sure if this will be necessary for your use case, but there might be unintended effects when running <code>diff</code> on the merge commit.</p>
+","11934042",""
+"66467894","61828726","2021-03-04 02:50:56","2","<p>What fixed the problem for me is in my YAML workflow, replacing</p>
+<pre><code>runs-on: ubuntu-latest 
+</code></pre>
+<p>with</p>
+<pre><code>runs-on: ubuntu-20.04
+</code></pre>
+<p>ubuntu-latest uses Ubuntu 18.04 and the SQLite version seems to be old and have an issue.</p>
+","464618",""
+"69922168","64359222","2021-11-11 01:23:49","1","<p>For the next person who runs into this -- this is basically just an issue with Azure SNAT and Maven interacting. Maven internally pools connections and Azure's SNAT closes them in a way that Java kinda can't see, and Github Actions (since GitHub is owned by Microsoft) runs in Azure.</p>
+<p>Anyway -- the fix with current Maven versions is to set a Maven parameter to dial down the TTL on the connection pool. If you need to use an older version, there are some other parameters you can use.</p>
+<p>So I added an env var to my workflow:</p>
+<pre class=""lang-yaml prettyprint-override""><code>MAVEN_OPTS: '-Dmaven.wagon.httpconnectionManager.ttlSeconds=120'
+</code></pre>
+<p>See also:</p>
+<ul>
+<li><a href=""https://maven.apache.org/configure.html"" rel=""nofollow noreferrer"">Configuring Maven</a> if you don't want to use MAVEN_OPTS</li>
+<li><a href=""https://issues.apache.org/jira/browse/WAGON-545?focusedCommentId=16755035&amp;page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-16755035"" rel=""nofollow noreferrer"">WAGON-545</a> and <a href=""https://issues.apache.org/jira/browse/WAGON-486"" rel=""nofollow noreferrer"">WAGON-486</a> if you want more information about the issue</li>
+<li><a href=""https://github.com/actions/virtual-environments/issues/1499"" rel=""nofollow noreferrer"">GH Actions Virtual Environments #1499</a> for a bit more on the GH side of things</li>
+</ul>
+","141042",""
+"66093697","66088277","2021-02-07 22:19:02","2","<p>Thanks for sharing this.  I have precisely the same problems.</p>
+<p>I added the following in my <code>Dockerfile</code></p>
+<pre><code>RUN sed -i 's/\tif \[\[ -r $MAKEPKG_CONF \]\]; then/\tif \[\[ -f $MAKEPKG_CONF \]\]; then/' /usr/share/makepkg/util/config.sh
+</code></pre>
+<p>which replaces the check for read permission (<code>-r</code>) for the check whether the file exists and is a regular file (<code>-f</code>).</p>
+<p>now my github action gets over this particular location, but fails with the next check:</p>
+<pre><code>==&gt; ERROR: You do not have write permission for the directory $BUILDDIR (/tmp/aurutils).
+    Aborting...
+</code></pre>
+<p>This is not a solution and does not answer what's the underlying issue, but I hope it helps anyways.</p>
+","2165903",""
+"66184907","66088277","2021-02-13 12:04:31","1","<p>This issue is caused by using glibc &gt;= 2.33 on the container and an outdated version of the Docker engine on the host.</p>
+<p>You can fix it by patching glibc in your container:</p>
+<pre class=""lang-sh prettyprint-override""><code>patched_glibc=glibc-linux4-2.33-4-x86_64.pkg.tar.zst
+curl -LO https://repo.archlinuxcn.org/x86_64/$patched_glibc
+bsdtar -C / -xvf $patched_glibc
+</code></pre>
+<p>Thanks to <a href=""https://github.com/lxqt/lxqt-panel/pull/1562/files"" rel=""nofollow noreferrer"">lxqt-panel</a> for the workaround.</p>
+","2599002",""
+"66445231","66358295","2021-03-02 18:38:25","0","<p>I fixed my problem by setting the <code>.git/config</code> file to what my local <code>.git/config</code> file was, and that solved the problem.  I don't know what part of the config file was causing the error, but I do know there was a problem with it.</p>
+","14539510",""
+"67371879","67369480","2021-05-03 15:47:14","0","<p>Script using checkout@V1 which works</p>
+<pre><code>name: Auto Merge prod-&gt;master
+on:
+  push:
+    branches: [ prod ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Merge prod-&gt;master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/&lt;github_user_name&gt;/&lt;repo_name&gt;
+        git config user.name &quot;test&quot;
+        git config user.email &quot;test@test.com&quot;
+        git fetch origin master
+        git checkout -b master origin/master
+        git merge origin/prod --ff-only
+        git push origin master
+</code></pre>
+","5992555",""
+"67376248","67369480","2021-05-03 21:50:19","4","<p>Although I have never used these, I suspect that <a href=""https://github.com/marketplace/actions/checkout"" rel=""nofollow noreferrer"">this</a> is the culprit:</p>
+<blockquote>
+<p><strong>Only a single commit is fetched by default, for the ref/SHA that triggered the workflow. Set fetch-depth: 0 to fetch all history for all branches and tags.</strong> Refer here to learn which commit $GITHUB_SHA points to for different events.</p>
+</blockquote>
+<p>(boldface mine).  With the single commit, Git cannot tell whether the merge would be a fast-forward; with the single branch, Git does not have the necessary branch names.  The extra fetches you run will fix <em>some</em> of these problems, but not enough of them.  Setting the fetch depth, as recommended right up front here, would thus fix the problem.</p>
+","1256452",""
+"72605051","67786526","2022-06-13 15:02:47","1","<p>Your workflow doesn't build the APK, and therefore, there's no <code>build/app/outputs/apk/release/*.apk</code> file. So the release action doesn't find the location of the <em>artifacts</em>. Here is the workflow you can use to modify yours and tweak it as you wish:</p>
+<pre><code># This is a basic workflow to help you get started with Actions
+
+name: Build Flutter APK
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the &quot;develop&quot; branch
+  push:
+    branches: [&quot;develop&quot;]
+    tags:
+      - &quot;v*&quot;
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called &quot;build&quot;
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v1
+        with:
+          java-version: &quot;12.x&quot;
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v1
+        with:
+          channel: &quot;beta&quot;
+
+      - name: Decode android/neumodore_key.jks
+        run: echo &quot;${{ secrets.KEYSTORE_JKS_PROD }}&quot; | base64 --decode &gt; android/keystore.jks
+
+      - name: Decode android/key.properties
+        run: echo &quot;${{ secrets.KEY_PROPERTIES_PROD }}&quot; | base64 --decode &gt; android/key.properties
+
+      - name: Pub Get Packages
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk 
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.10.0
+        with:
+          artifacts: &quot;build/app/outputs/apk/release/*.apk&quot;
+</code></pre>
+","9844964",""
+"68918609","68005219","2021-08-25 07:30:05","3","<p>You cannot use the 3-legged variant of OAuth2.0 (aka &quot;web-application flow&quot;) in a headless environment like Github Actions.</p>
+<p>If you want to use OAuth (I list other possibilities below), then you need to utilize what gitlab calls the &quot;device-flow&quot;. See <a href=""https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#device-flow"" rel=""nofollow noreferrer"">github documentation</a>.</p>
+<p>In this flow, there is no redirect to a given URL, so the app does not need a browser window. Instead it displays a code to the user. The user must the enter that code on a fixed URL (<a href=""https://github.com/login/device"" rel=""nofollow noreferrer"">https://github.com/login/device</a>). As soon as this is done, the app can request the authentication token. (So the app must keep polling until the user has entered the code).</p>
+<p>Unfortunately, <code>httr</code> does not have nice wrapper functions for this variant, so you have to do the calls yourself. It can work like this:</p>
+<pre><code>library(httr)
+
+
+
+app_id &lt;- &quot;*redacted*&quot;
+
+
+r &lt;- POST(&quot;https://github.com/login/device/code&quot;, 
+          body = list(
+            client_id = app_id,
+            scope = &quot;user repo delete_repo&quot; #Scope must be given! https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps
+))
+
+
+device_code &lt;- content(r)$device_code
+
+print(paste0(&quot;Enter the code  &quot;, content(r)$user_code, &quot;  at &quot;, content(r)$verification_uri))
+
+
+## NOTE: In reality this request has to run in a loop, until the user has entered the code und the request succeeds.
+##       For the demo we can execute it manually after the code has been entered.
+r &lt;- POST(&quot;https://github.com/login/oauth/access_token&quot;, 
+          body = list(
+            client_id = app_id,
+            device_code = device_code,
+            grant_type = &quot;urn:ietf:params:oauth:grant-type:device_code&quot;
+          ))
+
+token &lt;- content(r)$access_token
+
+## create and delete a private testrepository to check if everything worked
+r &lt;- 
+  POST(&quot;https://api.github.com/user/repos&quot;,
+       add_headers(Authorization = paste(&quot;token&quot;, token)),
+       body = list(name = &quot;testrepo&quot;,
+                 private = TRUE,
+                 auto_init = FALSE), 
+       encode = &quot;json&quot;)
+
+
+r &lt;- DELETE(paste0(&quot;https://api.github.com/repos/&quot;, content(r)$full_name), 
+       add_headers(Authorization = paste(&quot;token&quot;, token)))
+</code></pre>
+<p>I have seen that there is <code>httr2</code>, and that it offers convenience functions for this flow. I have however never used it and do not know if it already works reliable. See <a href=""https://httr2.r-lib.org/reference/req_oauth_device.html"" rel=""nofollow noreferrer"">here</a>.</p>
+<p>Since this flow still requires user interaction, you may be better of with one of the following variants (I do not know if they fit your use case.):</p>
+<ol>
+<li><p><strong>Basic Auth:</strong>
+You can define what github calls a &quot;personal access token&quot; beforehand. With this token you can authenticate without further interaction. Creation is described <a href=""https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token"" rel=""nofollow noreferrer"">here</a>. In R you can use it most easily together with <code>httr::authenticate</code>.</p>
+</li>
+<li><p><strong>GITHUB_TOKEN:</strong>
+Github automatically creates special secrets specifically Github Actions. These can be used to execute actions in the containing repository. For more info see <a href=""https://docs.github.com/en/actions/reference/authentication-in-a-workflow"" rel=""nofollow noreferrer"">here</a>.</p>
+</li>
+</ol>
+","6664578",""
+"68868105","68812228","2021-08-20 21:12:21","0","<p>Figured it out.</p>
+<p>The component was calling &quot;DottedNoteBook&quot; but the file name is &quot;DottedNotebook.vue&quot;. (Different case for the letter &quot;B&quot;.)</p>
+<p>I'm not sure why that case issue never came up before or preventing compiling outside of the GitHub Actions, but that was the issue. Thanks, @Tarkan for making me look closer at that.</p>
+","523530",""
+"69275725","69263214","2021-09-21 21:25:21","1","<p>It was difficult to resolve, but you have to specify a <code>port</code> as well as a <code>host</code> in the <code>firebase.json</code> file.</p>
+<pre><code>{
+  &quot;emulators&quot;: {
+    &quot;auth&quot;: {
+      &quot;port&quot;: 9099,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;functions&quot;: {
+      &quot;port&quot;: 5001,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;firestore&quot;: {
+      &quot;port&quot;: 8080,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;database&quot;: {
+      &quot;port&quot;: 9000,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;hosting&quot;: {
+      &quot;port&quot;: 5000,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;pubsub&quot;: {
+      &quot;port&quot;: 8085,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;storage&quot;: {
+      &quot;port&quot;: 9199,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;ui&quot;: {
+      &quot;enabled&quot;: true
+    }
+  }
+}
+</code></pre>
+","7655295",""
+"78377843","69385940","2024-04-24 10:49:39","0","<p>It fails because there is no postgres instance running on the CI runner. So when your app tries to reach it at <code>postgresql://test:testing@localhost:5432/test</code> it cannot find it. Also, it is bad idea to try to connect the prod (or any environment) db in the outside world to the runner. An alternative is to use <a href=""https://pypi.org/project/testing.postgresql/"" rel=""nofollow noreferrer""><code>testing.postgresql</code></a>. This creates a database in a temp dir. But for this you might need <code>libpq-dev</code> and <code>gcc</code> to be installed in the runner, either via your app's docker image or in the CI yml file.</p>
+","4260095",""
+"69466751","69465391","2021-10-06 13:32:26","0","<p>Try the following:</p>
+<pre><code>cat ~/.ssh/id_rsa.pub
+</code></pre>
+<p>and copy the public key to</p>
+<pre><code>nano ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/id_rsa
+</code></pre>
+","10868301",""
+"70250915","70244456","2021-12-06 19:29:40","2","<p>Ok, that was unexpected. First I stumbled upon a hint to change the input and output encoding of the PowerShell console:</p>
+<pre><code>[console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding
+</code></pre>
+<p>And that revealed a new problem, namely that <code>gitversion.exe</code> wasn't a valid windows executable. It turned out to be the LFS pointer file.</p>
+<pre><code>ResourceUnavailable: D:\a\azure-pipelines-pre-and-post-tasks\azure-pipelines-pre-and-post-tasks\build.ps1:179
+Line |
+ 179 |  $versionInfo = &amp; .\gitversion.exe | ConvertFrom-Json
+     |  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Program 'gitversion.exe' failed to run: An error occurred trying to start process
+     | 'D:\a\azure-pipelines-pre-and-post-tasks\azure-pipelines-pre-and-post-tasks\gitversion.exe' with
+     | working directory 'D:\a\azure-pipelines-pre-and-post-tasks\azure-pipelines-pre-and-post-tasks'. The
+     | specified executable is not a valid application for this OS platform.
+</code></pre>
+<p>I had forgotten to add:</p>
+<pre><code>with:
+  lfs: true
+</code></pre>
+<p>To my checkout task:</p>
+<pre><code>steps:
+- uses: actions/checkout@v2
+  with:
+    lfs: true
+</code></pre>
+<p>Whatever error was thrown by the operating system caused the error in the title of this post. But the real issue was the actual executable was missing.</p>
+","736079",""
+"74667171","70734715","2022-12-03 13:25:47","0","<p>Please try it</p>
+<pre><code># Vue 2
+npm install --save-dev @vue/vue2-jest@28 # (use the appropriate version)
+
+yarn add @vue/vue2-jest@28 --dev
+
+
+
+# Vue 3
+npm install --save-dev @vue/vue3-jest@28 # (use the appropriate version)
+
+yarn add @vue/vue3-jest@28 --dev
+</code></pre>
+","9353539",""
+"70775420","70758763","2022-01-19 17:48:32","0","<p>Turns out that in my view class I had something like this:</p>
+<pre><code>public class MyView extends JFrame{
+    private CardLayout layout;
+    private JPanel myPane;
+        
+    public MyView() {
+        setResizable(false);
+        setTitle(&quot;View&quot;);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setBounds(100, 100, 450, 300);
+
+        layout = new CardLayout();
+        getContentPane().setLayout(layout);
+        myPane = new JPanel();
+        getContentPane().add(myPane, &quot;pane&quot;);
+
+        layout.show(getContentPane(), &quot;layout&quot;);
+        pack();
+        setLocationRelativeTo(null);    
+    }
+}
+</code></pre>
+<p>Removing the last three lines fixed it for me. I suppose that they were interfering with <code>xvfb</code>. Also it seems that they add no value to the code itself and it is safe to remove them.</p>
+","14774959",""
+"72394059","72367855","2022-05-26 15:12:40","2","<p>In the traceback you have <code>getenv('IMAP')</code> but the environment variable is not defined in your workflow.</p>
+<p>Hope that helps.</p>
+","7087644",""
+"72506647","72493761","2022-06-05 10:40:34","0","<p>Can you please run this command on your local machine to see the build failure:</p>
+<pre class=""lang-bash prettyprint-override""><code>npm build
+</code></pre>
+<p>Your application build is failing and you might not be able to get the error because you are running the app in development mode, not the production mode.</p>
+<p>Coming to your React error, it is because you need to wrap <code>routes</code> (<code>Routes</code> / <code>useRoutes</code>) inside a <code>Router</code> element.</p>
+<p>This is what you can put for your entry-point:</p>
+<pre><code>import ReactDOM from 'react-dom';
+import { BrowserRouter } from 'react-router-dom';
+
+
+ReactDOM.render(
+  &lt;BrowserRouter&gt;
+    &lt;App /&gt;
+  &lt;/BrowserRouter&gt;,
+  document.getElementById('root'),
+);
+</code></pre>
+","10527823",""
+"75561349","72819996","2023-02-24 21:02:33","0","<p>I would try and add it to your <code>dependencies</code> instead of <code>devDependencies.</code> I have found that doing that will sometimes solve the issue of missing packages during ci/cd builds.</p>
+","12658653",""
+"72994654","72994320","2022-07-15 13:19:31","0","<p>Not an answer but a fragment to try. My <code>Github</code> action runner for <code>ubuntu-latest</code> looks as follows (you probably want to replace the <code>install</code> target in <code>CMake</code> build command with <code>all</code>.</p>
+<pre><code>jobs:
+  ubuntu-build:
+    name: Ubuntu Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+      - name: Create build directory and run CMake
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libboost-dev
+          cmake -S . -B cmake_build_dir -G &quot;Unix Makefiles&quot; -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=cmake_install_dir
+      - name: Build project
+        run: cmake --build cmake_build_dir --target install --config Release -- -j4
+      - name: Run tests
+        run:  ctest -C Release -VV
+        working-directory: cmake_build_dir
+      - name: Create Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: Ubuntu-Artifacts
+          path: cmake_install_dir/
+        if: always()
+</code></pre>
+","5251059",""
+"72994790","72994320","2022-07-15 13:29:29","2","<p>github.com will give you a fresh runner for every job.</p>
+<p>See here <a href=""https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#using-a-github-hosted-runner"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#using-a-github-hosted-runner</a> for details.</p>
+<p>Thus it is not possible to prepare the machine in one job and use it in a later job.</p>
+<p>You should move the installation of the needed packages inside your build job.</p>
+<p>In case you need to exchange artifacts, like binaries from one job to a later job, you should take a look at the github actions <a href=""https://github.com/actions/upload-artifact"" rel=""nofollow noreferrer"">upload-artifact</a> and <a href=""https://github.com/actions/download-artifact"" rel=""nofollow noreferrer"">download-artifact</a>.</p>
+","8281848",""
+"73499601","73497571","2022-08-26 10:28:59","2","<p>I haven't understood the cause yet.</p>
+<p>My current workaround is to disable the configuration cache on CI builds adding the option <code>--no-configuration-cache</code> to all gradle commands e.g.</p>
+<pre><code>./gradlew test --no-configuration-cache
+</code></pre>
+<p>This overwrites the setting of <code>gradle.properties</code>.</p>
+","2011622",""
+"77691574","73497571","2023-12-20 12:24:36","0","<p>Same here, config cache is failing in jenkins pipeline, and working fine in local.</p>
+<p>See <a href=""https://stackoverflow.com/a/69113397/7466467"">this comment</a>, it helped. It changes the error to a warning, lets it ignore problems in the config cache (only when it fails) and stores it anyway</p>
+<p>Console Output:</p>
+<pre><code>3 problems were found storing the configuration cache, 1 of which seems unique.
+- Task `:app:buildKotlinToolingMetadata` of type `org.jetbrains.kotlin.gradle.tooling.BuildKotlinToolingMetadataTask$FromKotlinExtension`: invocation of 'Task.project' at execution time is unsupported.
+....
+...
+
+BUILD SUCCESSFUL in 4m 56s
+1779 actionable tasks: 715 executed, 1062 from cache, 2 up-to-date
+Configuration cache entry stored with 3 problems.
+</code></pre>
+<p>I will update about it's impact if there is any.</p>
+","7466467",""
+"73748536","73717018","2022-09-16 17:42:04","1","<p>Have you also unzipped the src.zip from s3?
+In the makefile you change into the src directory and zip everything underneath, while in the ci yml, you change into data_compaction and zip the src directory recursively, which includes the src directory. It should work again, when you change the CI command to:</p>
+<pre><code>  - name: Create Zip File
+    uses: montudor/action-zip@v0.1.0
+    with:
+      args: sh -c &quot;cd data_compaction/src &amp;&amp; zip -r ../src.zip .&quot;
+</code></pre>
+","8384047",""
+"73822678","73822327","2022-09-23 03:25:37","0","<p>Fixed by using yandex/clickhouse instead of clickhouse/clickhouse</p>
+","7628816",""
+"75023910","74912797","2023-01-05 20:18:07","3","<p>I'm pretty certain the issue happens on Linux specifically, as on Windows and macOS it's running inside a VM. The reason why it would occur in a &quot;real Linux&quot; machine and not in a VM is because user ids and group ids are shared between the &quot;docker host&quot; and docker containers (see more <a href=""https://medium.com/@mccode/understanding-how-uid-and-gid-work-in-docker-containers-c37a01d01cf"" rel=""nofollow noreferrer"">here</a>)</p>
+<p>The GitHub Actions probably has designated permissions for the uids/gids that are contained in the tar.gz and also of the tar.gz itself, while on your local macOS/Windows the dedicated VM for docker doesn't have any &quot;real&quot; user management using Linux.</p>
+<p>I had a similar issue when I used Bitbucket's CI which has some weird policies arounds <a href=""https://confluence.atlassian.com/bbkb/build-fails-due-to-error-container-id-cannot-be-mapped-to-host-id-error-1189491384.html"" rel=""nofollow noreferrer"">uids/gids.</a> This is probably a similar case.</p>
+","9266051",""
+"75720806","75720649","2023-03-13 10:44:22","-3","<pre><code>def write(filename, text):
+
+    with open(filename, 'w') as file:
+        file.write(text)
+
+filename = 'example.txt'
+
+text = '12works!'
+
+write(filename, text)
+</code></pre>
+<p>The text is what you going to write into the file</p>
+","21388440",""
+"78443337","76259462","2024-05-07 14:46:46","1","<p>Recently, I found out that <a href=""https://github.com/actions/runner-images/issues/1519#issuecomment-683790054"" rel=""nofollow noreferrer"">ping doesn't work in GitHub actions</a> at all because the hosted runner uses a specific type of Azure machine that doesn't allow it by design :(</p>
+","9124072",""
+"76435762","76424344","2023-06-08 21:21:52","3","<p>Thanks for adding the full details.</p>
+<p>I can't say definitively what it is, but some things to try:</p>
+<ul>
+<li><p>it isn't missing the fixture file, since <code>cy.fixture(&quot;taskList&quot;)</code> would throw a different error.</p>
+</li>
+<li><p>it might be using a different version of the <code>taskList</code>, but can't see how. Add an <code>expect()</code> to see if the fixture file is correct</p>
+<pre class=""lang-js prettyprint-override""><code>cy.fixture(&quot;taskList&quot;).then((taskList) =&gt; {
+  expect(taskList[0].task).to.eq('Do the laundry')
+</code></pre>
+</li>
+<li><p>use <code>cy.get(...).should('contain', taskList[0].task)</code> for a better error message - it should tell you what the task texts actually are.</p>
+</li>
+<li><p>since it's React, try adding a <code>cy.wait(0)</code> after the <code>click()</code>. Sometimes hooks do not complete their event handlers because the Cypress test hogs the Javascript thread, and <code>cy.wait(0)</code> releases the thread so that React hooks can complete the <code>click()</code> action.</p>
+</li>
+<li><p>instead of increasing the timeout to <code>20_000</code> for the Github run, try <em>decreasing</em> it to say 200 - 500 ms for the <em>local</em> run to see if you can reproduce the error locally</p>
+</li>
+</ul>
+","20771654",""
+"76718502","76424344","2023-07-19 06:26:52","0","<p>add
+<em><strong>numTestsKeptInMemory: 0</strong></em>
+in your cypress.config file</p>
+<p>Thanks!</p>
+","14504581",""
+"76450403","76434747","2023-06-11 12:05:33","1","<p>Ok, so the issue was resolved by removing the usage of <code>pyargs</code> from the pytest command..</p>
+","8082027",""
+"76573716","76570482","2023-06-28 13:35:11","0","<p>The boilerplate code <a href=""https://create.t3.gg"" rel=""nofollow noreferrer"">create-t3-app</a> I used, ignored <code>next-env.d.ts</code> type declaration file from git which included a lot of types including image types.</p>
+<p>This is why <code>tsc --noEmit</code> is working locally but not on GitHub CLI.</p>
+<p>I just added this file to the repo and the build is succeeding ✅</p>
+","9698583",""
+"77395417","77395114","2023-10-31 11:17:29","3","<p>You have a <code>gh-action-test</code> <strong>directory</strong> in which there is a <code>gh-action-test</code> file, that's what the <code>d</code> in <code>dr-xr-xr-x</code> stands for. The <code>ls -l .</code> command shows the <code>gh-action-test</code> directory which is inside the current directory. The <code>ls -l gh-action-test</code> command shows the <code>gh-action-test/gh-action-test</code> file.</p>
+<p>If you do <code>ls -ld gh-action-test</code>, you should see the same permissions as in <code>ls -l .</code></p>
+","5397009",""
+"77446960","77446605","2023-11-08 15:34:04","3","<p>You need to install the dependencies in your action in order for it to work. Adding <code>poetry install</code> after your pip statement is an immediate fix, but there are some further tweaks you should make.</p>
+<p>Your project needs to be tweaked for pytest to pick up your tests.
+pytest requires that your files be prefixed with <code>test_</code>, and all test classes should start with <code>Test</code>.</p>
+<p>You should have poetry manage pytest and pylint as dev dependencies so that they are installed within the venv only when you include them in your github actions (and locally) by running <code>poetry install --with dev</code>:</p>
+<pre><code># in pyproject.toml
+[tool.poetry.group.dev.dependencies]
+pytest = &quot;^7.4.3&quot;
+pylint = &quot;^3.0.2&quot;
+</code></pre>
+<p>You'll also want to include the current directory in your pythonpath for pytest:</p>
+<pre><code># in pyproject.toml
+[tool.pytest.ini_options]
+pythonpath = [
+  &quot;.&quot;
+]
+</code></pre>
+<p>You'll also want to add an init-hook for pylint to handle imports correctly while in the venv:</p>
+<pre><code>[MASTER]
+init-hook='import sys; sys.path.append(&quot;.&quot;)'
+# ...
+</code></pre>
+<p>From there, you can just use poetry to manage both pytest and pylint.</p>
+<pre><code># snippet of test.yml
+# ...
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install --with dev
+
+    - name: Run tests
+      run: poetry run pytest
+
+    - name: Lint
+      run: poetry run pylint $(git ls-files '*.py')
+</code></pre>
+","6106614",""

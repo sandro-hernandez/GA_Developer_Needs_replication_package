@@ -1,0 +1,3050 @@
+AnswerId,QuestionId,AnswerCreationDate,AnswerScore,AnswerBody,AnswerAuthorId,AnswerAuthorName
+"57521953","57509118","2019-08-16 09:15:47","4","<p>As mentioned in the <a href=""https://help.github.com/en/articles/workflow-syntax-for-github-actions#jobs"" rel=""nofollow noreferrer"">Workflow syntax docs</a>:</p>
+
+<blockquote>
+  <p>Each job runs in a fresh instance of the virtual environment specified by runs-on.</p>
+</blockquote>
+
+<p>From what I can see here, you're doing the checkout step in a completely separate job from others. Doing it that way it does not affect other jobs in any way. It should actually be defined <em>inside</em> those jobs where your npm CLI commands are executed.</p>
+
+<p>Here's an example of how it would look like in one of your jobs:</p>
+
+<pre><code>jobs:
+  # (...) Other jobs
+  # Install Dependencies
+  install_dependencies:
+    name: Install Dependencies
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [10.x]
+    steps:
+    - uses: actions/checkout@master
+    - run: yarn dep:install-npm
+    needs: checkout
+  # (...) Other jobs
+</code></pre>
+
+<p>There are some general examples in <a href=""https://github.com/actions/starter-workflows/blob/master/ci/npm-publish.yml"" rel=""nofollow noreferrer"">GitHub starter workflow templates</a>.</p>
+","7029969",""
+"57806894","57806624","2019-09-05 13:43:24","121","<p>If I understand your needs, you need the <code>pub</code> steps to run as if you'd done a <code>cd dart_project</code> first, right? Add the <a href=""https://help.github.com/en/articles/workflow-syntax-for-github-actions#jobsjob_idstepsworking-directory"" rel=""noreferrer""><code>working-directory</code></a> parameter to your steps:</p>
+<pre><code>steps:
+- uses: actions/checkout@v1
+- name: Install dependencies
+  run: pub get
+  working-directory: dart_project
+- name: Run tests
+  run: pub run test
+  working-directory: dart_project
+</code></pre>
+<p>If you want to apply it to every step, use the tag <code>defaults</code></p>
+<pre class=""lang-yaml prettyprint-override""><code>defaults:
+  run:
+    working-directory: dart_project
+</code></pre>
+<p>I believe that should be all you need.</p>
+","2314532",""
+"69494898","57806624","2021-10-08 11:09:05","36","<p>You can configure a <code>working-directory</code> on the step level for this purpose.
+You can also configure a default directory for the steps. Defaults can be on job or global level.</p>
+<p>Example on step level.</p>
+<pre class=""lang-yaml prettyprint-override""><code>jobs:
+  build:
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install dependencies
+        run: pub get
+        working-directory: dart_project
+      - name: Run tests
+        run: pub run test
+        working-directory: dart_project
+</code></pre>
+<p>Example on job level. This reduces duplication on the job level. This is suited for a job that is working on a sub-directory.</p>
+<pre class=""lang-yaml prettyprint-override""><code>jobs:
+  build:
+    defaults:
+      run:
+        working-directory: dart_project
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install dependencies
+        run: pub get
+      - name: Run tests
+        run: pub run test
+</code></pre>
+<p>Example on global level. This reduces duplication on the global level. This is suited when all jobs in the workflow file are for a project located in a sub-directory.</p>
+<pre class=""lang-yaml prettyprint-override""><code>defaults:
+  run:
+    working-directory: dart_project
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install dependencies
+        run: pub get
+      - name: Run tests
+        run: pub run test
+</code></pre>
+","1485189",""
+"57841564","57839795","2019-09-08 11:34:53","6","<p>Your job is configured to run in an <code>alpine-latest</code> environment, but <a href=""https://help.github.com/en/articles/virtual-environments-for-github-actions"" rel=""noreferrer"">GitHib doesn't provide <code>alpine-latest</code> as one of their workflow environments</a>. Your choices are <code>ubuntu-latest</code>, <code>macOS-latest</code>, <code>windows-latest</code>, or a specific version of one of those three OSes. Change <code>runs-on: alpine-latest</code> to <code>runs-on: ubuntu-latest</code> and your workflow should start.</p>
+","2314532",""
+"64873291","57839795","2020-11-17 10:18:28","0","<p>Although this doesn't answer the specific OP question, search engines bring us here, looking for the answer to why one's pipeline is stuck on &quot;Starting your workflow run...&quot;</p>
+<p>If you are running your runner in a container, the chances are, Github has released a new version of the runner and your container is trying to update itself.
+You can check the below URL to see when Github released the latest version:
+<a href=""https://github.com/actions/runner/releases"" rel=""nofollow noreferrer"">https://github.com/actions/runner/releases</a></p>
+<p>There are a lot of requests for Github to provide a feature to stop automatic updates, but to date (17/11/2020) they refuse to do so, claiming they need the auto-update functionality to support new features.</p>
+<p>The suggested workaround is to develop a build pipeline for your container that builds automatically when they push a new release.</p>
+","3167379",""
+"58230268","58222386","2019-10-04 05:11:22","15","<p>I spent some time trying different things to get this to work. I found a solution, but quite honestly, I'm not sure <em>why</em> it works. I simply added <code>-h 127.0.0.1</code> to the mysql command.</p>
+
+<p>I also added the health check flags to <code>options</code> to make sure the service is able to accept requests.</p>
+
+<p>This is a working workflow:</p>
+
+<pre><code>name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: test
+        ports:
+            - '8888:3306'
+        options: --health-cmd=""mysqladmin ping"" --health-interval=10s --health-timeout=5s --health-retries=3
+    steps:
+      - uses: actions/checkout@v1
+      - run: mysql -h 127.0.0.1 --port 8888 -u root -ppassword -e 'CREATE DATABASE IF NOT EXISTS test;'
+</code></pre>
+","11934042",""
+"58636619","58630097","2019-10-31 03:40:17","11","<p>I think you can resolve it by associating <code>master</code> with <code>origin master</code> like this:</p>
+
+<pre><code>git fetch origin master:master
+git diff --name-only master
+</code></pre>
+
+<p>Be aware that events that trigger <code>on: pull_request</code> workflows are not associated with a branch, they are associated with a merge commit SHA. So <code>actions/checkout@v1</code> by default will checkout the merge commit specified by <code>GITHUB_SHA</code>, not the branch that is merging into the base. See the <a href=""https://help.github.com/en/github/automating-your-workflow-with-github-actions/events-that-trigger-workflows#pull-request-event-pull_request"" rel=""noreferrer"">documentation here</a>. </p>
+
+<p>You can override this default behaviour and checkout the branch merging into the base like this:</p>
+
+<pre><code>      - uses: actions/checkout@master
+        with:
+          ref: ${{ github.head_ref }}
+</code></pre>
+
+<p>I'm not sure if this will be necessary for your use case, but there might be unintended effects when running <code>diff</code> on the merge commit.</p>
+","11934042",""
+"58661967","58643905","2019-11-01 15:37:43","28","<p>Luckily the <code>aws-sdk</code> should <a href=""https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-environment.html"" rel=""noreferrer"">automatically detect credentials</a> set as environment variables and use them for requests</p>
+<p>To get access to secrets in your action, you need to set them in the repo. Then you can expose them to the step as an env var.</p>
+<p>For more details see <a href=""https://docs.github.com/en/actions/reference/encrypted-secrets"" rel=""noreferrer"">GitHub Encrypted secrets</a></p>
+<ol>
+<li>On GitHub, navigate to the main page of the repository</li>
+<li>Under your repository name, click the ⚙ Settings tab</li>
+<li>Repository settings button</li>
+<li>In the left sidebar, click Secrets</li>
+<li>Type a name for your secret in the &quot;Name&quot; input box</li>
+<li>Type the value for your secret</li>
+<li>Click Add secret</li>
+</ol>
+<p>In your case you will want to add secrets for both <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>.</p>
+<p>Now that those are set you can pass those values into the action via the workflow yaml:</p>
+<pre><code>steps:
+...
+- name: Unit Test
+  uses: ...
+  env:
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  run: ...
+</code></pre>
+","19839",""
+"63353159","58643905","2020-08-11 07:06:27","0","<p>If running <code>aws</code> from the command line is acceptable for you, you can set the following ENV vars and just use <code>aws</code> commands without needing to run <code>aws configure</code>:</p>
+<pre><code>env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_DEFAULT_OUTPUT: json
+</code></pre>
+","2771889",""
+"66456314","58643905","2021-03-03 11:38:52","6","<p>Take a look at: <a href=""https://github.com/aws-actions/configure-aws-credentials"" rel=""noreferrer"">https://github.com/aws-actions/configure-aws-credentials</a></p>
+<p>It allows you to configure AWS credential and region environment variables for use in other GitHub Actions. The environment variables will be detected by both the AWS SDKs and the AWS CLI to determine the credentials and region to use for AWS API calls.</p>
+","3156607",""
+"70229928","58643905","2021-12-04 22:13:30","20","<p>Avoid using long term and hard coded credentials.</p>
+<p>The <a href=""https://github.com/aws-actions/configure-aws-credentials"" rel=""noreferrer"">configure-aws-credentials</a> action provides a mechanism to configure AWS credential and region environment variables for use in other GitHub Actions. The environment variables will be detected by both the AWS SDKs and the AWS CLI to determine the credentials and region to use for AWS API calls.</p>
+<p>I recommend configuring <a href=""https://github.com/aws-actions/configure-aws-credentials"" rel=""noreferrer"">configure-aws-credentials</a> to use OpenID Connect (OIDC). This allows your GitHub Actions workflows to access resources in AWS, without needing to store the AWS credentials as long-lived GitHub secrets. The <a href=""https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services"" rel=""noreferrer"">GitHub Configuring OpenID Connect in AWS</a> post walks through setting this up.</p>
+<p>To give you a practical example, I set up a pipeline to upload dummy data to a S3 bucket. First set up an OpenID Connect provider, and a role for github to federate into in your AWS account. The examples in <a href=""https://github.com/aws-actions/configure-aws-credentials"" rel=""noreferrer"">configure-aws-credentials</a> are written in CloudFormation but I've translated them to the Python Cloud-Development-Kit(CDK) below. Make sure to change the role condition to match your repository.</p>
+<pre class=""lang-py prettyprint-override""><code>        github_oidc_provider = iam.OpenIdConnectProvider(
+            self,
+            &quot;GithubOIDC&quot;,
+            url=&quot;https://token.actions.githubusercontent.com&quot;,  
+            thumbprints=[&quot;a031c46782e6e6c662c2c87c76da9aa62ccabd8e&quot;],
+            client_ids=[
+                &quot;sts.amazonaws.com&quot; 
+            ]
+        )
+
+        github_actions_role = iam.Role(
+            self,
+            &quot;DeployToBucketRole&quot;,
+            max_session_duration=cdk.Duration.seconds(3600),
+            role_name=&quot;github-actions-role&quot;,
+            description=&quot;Github actions deployment role to S3&quot;,
+            assumed_by=iam.FederatedPrincipal(
+                federated=github_oidc_provider.open_id_connect_provider_arn,
+                conditions={
+                    &quot;StringLike&quot;: {
+                        # &lt;GITHUB USERNAME&gt;/&lt;YOUR REPO NAME&gt;
+                        &quot;token.actions.githubusercontent.com:sub&quot;: 'repo:arbitraryrw/cdk-github-actions-demo:*' 
+                    }
+                },
+                assume_role_action=&quot;sts:AssumeRoleWithWebIdentity&quot;
+            )
+        )
+
+        bucket = s3.Bucket(
+            self,
+            f&quot;example_bucket&quot;,
+            bucket_name=&quot;cdk-github-actions-demo&quot;,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            enforce_ssl=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+            auto_delete_objects=True
+        )
+
+        # Give the role permissions to read / write to the bucket
+        bucket.grant_read_write(github_actions_role)
+</code></pre>
+<p>You can then reference this in your pipeline and run AWS CLI / SDK commands using these credentials. Notice that the snippet references <a href=""https://docs.github.com/en/actions/security-guides/encrypted-secrets"" rel=""noreferrer"">Github Encrypted Secrets</a>, I recommend leveraging this functionality:</p>
+<pre class=""lang-yaml prettyprint-override""><code>name: Example CDK Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Emulate build step
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checking out repository
+      uses: actions/checkout@v2
+    - name: &quot;Upload artifacts&quot;
+      uses: actions/upload-artifact@v2
+      with:
+        name: build-artifacts
+        path: ${{ github.workspace }}/resources
+
+  deploy:
+    needs: build
+    name: Deploy build artifacts to S3
+    runs-on: ubuntu-latest
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: &quot;Download build artifacts&quot;
+      uses: actions/download-artifact@v2
+      with:
+        name: build-artifacts
+        path: ${{ github.workspace }}/resources
+
+    - name: Configure AWS credentials from Test account
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: us-east-1
+        role-to-assume: ${{ secrets.AWS_ROLE_FOR_GITHUB }}
+        role-session-name: GitHubActions
+    - run: aws sts get-caller-identity
+    - name: Copy files to the test website with the AWS CLI
+      run: |
+        aws s3 sync ./resources s3://${{ secrets.BUCKET_NAME }}
+</code></pre>
+<p>For a full example on how to set this up using the CDK you can take a look at the <a href=""https://github.com/arbitraryrw/cdk-github-actions-demo"" rel=""noreferrer"">cdk-github-actions-demo</a> repo I set up.</p>
+","17412658",""
+"74890717","58643905","2022-12-22 15:35:44","2","<p>I was hitting my head against the wall on the same thing for a while.
+In my case the setting <code>profile = default </code> was the issue.</p>
+<p>I was able to remove that from my script and only having env. If I had both it would throw an error.</p>
+<pre><code>env:
+    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    AWS_DEFAULT_REGION: 'us-east-1'
+</code></pre>
+","12597634",""
+"59242962","59236611","2019-12-09 05:23:11","4","<p>As <a href=""https://stackoverflow.com/a/59238828/2089675"">another (deleted) answer</a> mentioned, this is a PATH issue.</p>
+
+<p>Use this workflow instead:</p>
+
+<pre><code>name: test
+on:
+  push:
+    branches:
+    - ""**""
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-latest
+        - macOS-latest
+        - windows-latest
+    steps:
+    - name: setup go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.x
+    - name: setup env
+      run: |
+        echo ""::set-env name=GOPATH::$(go env GOPATH)""
+        echo ""::add-path::$(go env GOPATH)/bin""
+      shell: bash
+    - name: checkout
+      uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+        path: src/github.com/${{ github.repository }}
+    - name: golint
+      run: |
+        go env
+        go install golang.org/x/lint/golint
+        golint ./...
+</code></pre>
+","2089675",""
+"59310425","59302035","2019-12-12 18:04:50","15","<p>You can try a <a href=""https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idstrategymatrix"" rel=""noreferrer""><code>matrix</code></a> configuration with:</p>
+<pre><code>name: test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        token: [token1, token2, etc...]
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up JDK 1.8
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+    - name: &quot;load configuration&quot;
+      run: echo &quot;configuration=$conf&quot; &gt;&gt; ./conf
+      env:
+        conf: ${{ matrix.token }}
+    - name: &quot;integration tests&quot;
+      run: &quot;mvn -B integration-test&quot;
+</code></pre>
+<p>This will create <code>N</code> jobs where <code>N</code> is the number of tokens in the list and each job with <code>conf: ${{ matrix.token }}</code> will resolve to a token in the list for the current job.</p>
+<hr />
+<p>I think it may also be possible to store your tokens as secrets and setup the matrix like:</p>
+<pre><code>strategy:
+  matrix:
+    token: [&quot;${{secrets.token1}}&quot;, &quot;${{secrets.token2}}&quot;, etc...]
+</code></pre>
+<p>However, I haven't tested this.</p>
+<h2>EDIT</h2>
+<p>I found a trick to make the secrets tokens work:</p>
+<ol>
+<li>Create your secrets and call them <code>token1</code>, <code>token2</code>, etc</li>
+<li>Create your matrix configuration using the tokens i.e. the names of the secrets:</li>
+</ol>
+<pre><code>strategy:
+  matrix:
+    token: [token1, token2]
+</code></pre>
+<ol start=""3"">
+<li>In your job's env, create the following environment variable:</li>
+</ol>
+<pre><code>env:
+  token: ${{secrets[matrix.token]}}
+</code></pre>
+<ol start=""4"">
+<li>Now the actual value for the token for each build matrix is stored inside the environment variable <code>${{env.token}}</code> (when operating within an expression context) or <code>$token</code> (in bash).</li>
+</ol>
+<p>The environment variable will still remain a secret, so you don't loose anything.</p>
+","2089675",""
+"59567187","59566458","2020-01-02 17:00:43","1","<p>Using <a href=""https://github.com/marketplace/actions/github-push"" rel=""nofollow noreferrer"">GitHub Push by ad-m</a> fixed my issue. I'm pretty sure that I already tested this action.</p>
+","5663348",""
+"69006543","59759353","2021-09-01 00:24:32","0","<p>Not sure if you are still having trouble with this, but if so, I had to add the workspace prefix to get this to work correctly.</p>
+<pre><code>-workspace ${GITHUB_WORKSPACE}/MyApp.xcworkspace
+</code></pre>
+","6592100",""
+"61238073","60157702","2020-04-15 20:29:55","2","<p>I hope this helps. I used this for my workflow, current branch is dev and I am firing the action when a push to the branch occurs.</p>
+
+<pre><code>name: Staging deployment
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+steps:
+  - uses: actions/checkout@v1
+
+  - name: Add api remote origin
+    run: |
+      git remote add heroku-api https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/${{ secrets.HEROKU_SERVE_APP_NAME }}.git
+  - name: Deploy api to Heroku
+    run: |
+      git subtree push --prefix server heroku-api master
+  - name: Add frontend remote origin
+    run: |
+      git remote add heroku-frontend https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/${{ secrets.HEROKU_FRONTEND_APP_NAME }}.git
+  - name: Deploy frontend to Heroku
+    run: |
+      git subtree push --prefix frontend heroku-frontend master
+</code></pre>
+
+<p>Ideally you could simplify this further by removing the step for setting a remote and use the url to Heroku directly at the deploy step.</p>
+","5682092",""
+"63124890","60349533","2020-07-27 23:09:50","0","<p>from <a href=""https://angular.io/cli/e2e"" rel=""nofollow noreferrer"">docs</a> should be not <code>--protractor-config=</code>  ...  but <code>--protractorConfig</code><br />
+or better set the config in angular.json by e2e configuration, as e.g. 'ci'.<br />
+Then run <code>npm run e2e -- -c=ci</code><br />
+<a href=""https://github.com/filipesilva/ng-github-actions/blob/master/.github/workflows/main.yml"" rel=""nofollow noreferrer"">example project</a></p>
+","2519073",""
+"60380617","60380374","2020-02-24 16:56:21","6","<p>If you want to use the Firebase CLI in a CI/CD environment such as GitHub Action, you'll have to provide a way for the CLI to know the account credentials it should use.  When you run locally, it can get the credentials from your interaction with <code>firebase login</code>.  But when you run elsewhere, there is no UI to prompt you.</p>
+
+<p>You will have to <a href=""https://firebase.google.com/docs/cli#cli-ci-systems"" rel=""noreferrer"">follow the instructions in the documentation on integrating with CI/CD system</a>, and provide a token for the account that should be used to authorize the deployment.</p>
+","807126",""
+"65351316","60840243","2020-12-18 03:08:22","12","<p>Using base64 we encode the service account JSON and pass it via environment variable. Then before calling the <code>activate-service-account</code> decode using the shell script.</p>
+<p><strong>Sample code:</strong></p>
+<pre class=""lang-bash prettyprint-override""><code>echo &quot;$GCP_CREDENTIALS&quot; &gt; gcp_credentials_enc.json
+cat gcp_credentials_enc.json | base64 -d &gt; gcp_credentials.json
+</code></pre>
+","1173495",""
+"75107847","60840243","2023-01-13 10:21:06","10","<p>You need to ensure it's handled correctly either at the YAML level (can be done using <code>|</code>):</p>
+<pre><code>  - env:
+      SSH_KEY: |
+        ${{ secrets.SSH_KEY }}
+</code></pre>
+<p>Or if a command in bash ensure it's correctly interpreted. For example if you are doing:</p>
+<p><code>echo ${{ secret.SSH_KEY }} </code></p>
+<p>this should instead be quoted so it becomes:</p>
+<p><code>echo &quot;${{ secret.SSH_KEY }}&quot;</code></p>
+","1663462",""
+"61748039","61096521","2020-05-12 09:18:31","35","<p>As GitHub Actions is basically a container that runs commands, have you considered <em>define your key as a secret on your project and then importing it in your Github Action definition</em>?</p>
+<p>Here are the steps I previously used on a project to publish the generated artifacts to Sonatype's staging repository:</p>
+<ul>
+<li>Open a terminal window.</li>
+<li>If you don't know your key ID, search it by e-mail: <code>gpg --list-secret-keys user@example.com</code></li>
+<li>Export your key as Base64: <code>gpg --export-secret-keys YOUR_ID_HERE | base64 &gt; private.key</code></li>
+<li>In your Github project, create a new Secret named <strong>GPG_SIGNING_KEY</strong> and paste the Base64 content of your key.</li>
+<li>In your yml workflow file, include a step to import the key from your just defined secret.</li>
+</ul>
+<pre><code>- name: Configure GPG Key
+  run: |
+    echo -n &quot;$GPG_SIGNING_KEY&quot; | base64 --decode | gpg --import
+  env:
+    GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+</code></pre>
+<p>So far, it works very well although there are a few limitations I couldn't solve:</p>
+<ul>
+<li>Your GPG Key should not be protected by a password. I couldn't figure out a way to import the protected keys without being asked for their secret.</li>
+<li>I couldn't find a way to use my GitHub GPG Key for this process.</li>
+</ul>
+<p>Just in case, <a href=""https://github.com/Skullabs/injector/blob/master/.github/workflows/release.yml"" rel=""noreferrer"">here</a> is a working example of a project using this approach to publish Maven <em>artifacts</em>. The only difference from the steps above, though, is that the commands were externalized into <a href=""https://github.com/Skullabs/injector/blob/master/builder.sh#L38"" rel=""noreferrer"">a bash script file</a>.</p>
+","548685",""
+"65658014","61096521","2021-01-10 20:13:09","2","<p>You can also use another plugin <a href=""https://www.simplify4u.org/sign-maven-plugin/"" rel=""nofollow noreferrer"">https://www.simplify4u.org/sign-maven-plugin/</a> for signing artifacts.</p>
+<p><code>sign-maven-plugin</code> simply takes signing key and rest configuration items from environment variables without special configuration.</p>
+<p>Another advantage of <code>sign-maven-plugin</code> is that you need not use profiles for activate or deactivate plugin, because when signing key is not preset for plugin, plugin skip execution without error.</p>
+","3149528",""
+"66218731","61096521","2021-02-16 04:34:02","25","<p>Adding a new answer, since this question is about using the GPG key in maven deployments in particular.</p>
+<h1>No Manual Import is Required when Using Maven</h1>
+<h2>Either use <code>maven-gpg-plugin</code> 3.2.0 or Newer</h2>
+<p><a href=""https://issues.apache.org/jira/browse/MGPG-106"" rel=""nofollow noreferrer"">Since version 3.2.0</a>, you can configure the plugin to use a Bouncy Castle based signer that does not depend on external gpg processes. You can configure the plugin to use this signer like so:</p>
+<pre class=""lang-xml prettyprint-override""><code>&lt;plugin&gt;
+    &lt;artifactId&gt;maven-gpg-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.2.4&lt;/version&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;sign-artifacts&lt;/id&gt;
+            &lt;phase&gt;verify&lt;/phase&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;sign&lt;/goal&gt;
+            &lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;signer&gt;bc&lt;/signer&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+</code></pre>
+<p>Now, all you need to do in you GitHub Actions is to define a couple of environment variables:</p>
+<pre class=""lang-yaml prettyprint-override""><code>- name: Publish to Apache Maven Central
+  run: mvn deploy
+  env:
+    OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+    OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+    MAVEN_GPG_PASSPHRASE: ${{ secrets.RELEASES_GPG_PASSPHRASE }}
+    MAVEN_GPG_KEY: ${{ secrets.RELEASES_GPG_PRIVATE_KEY }}
+</code></pre>
+<h2>Alternatively, the <code>setup-java</code> Action Can Set up Your GPG Agent</h2>
+<p>But even when you need to use older versions of the <code>maven-gpg-plugin</code>, the <code>setup-java</code> action supports everything out of the box. There is an <a href=""https://github.com/actions/setup-java/blob/v3.11.0/docs/advanced-usage.md#Publishing-using-Apache-Maven"" rel=""nofollow noreferrer"">example in the docs</a>:</p>
+<pre class=""lang-xml prettyprint-override""><code>&lt;plugin&gt;
+    &lt;artifactId&gt;maven-gpg-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.2.4&lt;/version&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;sign-artifacts&lt;/id&gt;
+            &lt;phase&gt;verify&lt;/phase&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;sign&lt;/goal&gt;
+            &lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;gpgArguments&gt;
+                    &lt;arg&gt;--pinentry-mode&lt;/arg&gt;
+                    &lt;arg&gt;loopback&lt;/arg&gt;
+                &lt;/gpgArguments&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+</code></pre>
+<pre class=""lang-yaml prettyprint-override""><code>    - name: Set up Apache Maven Central
+      uses: actions/setup-java@v3
+      with: # running setup-java again overwrites the settings.xml
+        java-version: 21
+        distribution: 'temurin'
+        cache: 'maven'
+        server-id: ossrh # Value of the distributionManagement/repository/id field of the pom.xml
+        server-username: OSSRH_USERNAME # env variable for username in deploy
+        server-password: OSSRH_TOKEN # env variable for token in deploy
+        gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }} # Value of the GPG private key to import
+        gpg-passphrase: MAVEN_GPG_PASSPHRASE # env variable for GPG private key passphrase
+
+    - name: Publish to Apache Maven Central
+      run: mvn deploy
+      env:
+        OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+        OSSRH_TOKEN: ${{ secrets.OSSRH_TOKEN }}
+        MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+</code></pre>
+<p>Note that the <code>setup-java</code> action configures Maven's <code>settings.xml</code> file for you automatically <em>and</em> imports the GPG key from the given stored secret.</p>
+<p>Be aware, that during <code>setup-java</code> you only configure the <em>names</em> of the environment variables. I.e. you need to provide the (secret) values for these env variables in later steps, where you want to use them.</p>
+","4014509",""
+"66457517","61096521","2021-03-03 12:53:59","22","<p>Thank You everyone for your response. I now use this GitHub actions which makes the process much more simpler:</p>
+<p>Step 1: Extract the secret key</p>
+<pre><code>gpg --list-secret-keys --keyid-format LONG
+gpg --export-secret-keys --armor {your_keyId}
+</code></pre>
+<p>Step 2: Store the extracted GPG key and passphrase as secrets</p>
+<p>step 3: Include this step in your workflow</p>
+<pre><code>- name: Import GPG Key
+  uses: crazy-max/ghaction-import-gpg@v1
+  env:
+     GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+     PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+</code></pre>
+","9590601",""
+"75568891","61096521","2023-02-25 22:42:10","0","<p>I came up with the following solution (see <a href=""https://gist.github.com/vansergen/88eb7e71fea2e3bdaf6aa3e752371eb7"" rel=""nofollow noreferrer"">here</a>)</p>
+<pre class=""lang-yaml prettyprint-override""><code>steps:
+  - name: Import GPG key
+    run: echo $GPG_KEY | base64 --decode | gpg --batch --import
+    env:
+      GPG_KEY: ${{ secrets.GPG_KEY }}
+
+  - name: Add the custom gpg siging program that passes the passphrase to the gpg CLI
+    run: |
+      rm -rf /tmp/gpg.sh
+      echo '#!/bin/bash' &gt;&gt; /tmp/gpg.sh
+      echo 'gpg --batch --pinentry-mode=loopback --passphrase $GPG_KEY_PASSPHRASE $@' &gt;&gt; /tmp/gpg.sh
+      chmod +x /tmp/gpg.sh
+
+  - name: Setup git
+    run: |
+      git config commit.gpgsign true
+      git config user.signingkey $GPG_KEY_ID
+      git config gpg.program /tmp/gpg.sh
+    env:
+      GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+</code></pre>
+","20644816",""
+"66467894","61828726","2021-03-04 02:50:56","2","<p>What fixed the problem for me is in my YAML workflow, replacing</p>
+<pre><code>runs-on: ubuntu-latest 
+</code></pre>
+<p>with</p>
+<pre><code>runs-on: ubuntu-20.04
+</code></pre>
+<p>ubuntu-latest uses Ubuntu 18.04 and the SQLite version seems to be old and have an issue.</p>
+","464618",""
+"62370921","62370850","2020-06-14 09:52:04","-1","<p>You can try to remove the <code>sudo</code> command.</p>
+","7972321",""
+"74045821","62370850","2022-10-12 17:25:04","-1","<p>The following worked for me by editing the <code>visudo</code> file</p>
+<blockquote>
+<p>do use this with caution as you are making sudo passwordless</p>
+</blockquote>
+<p>Editing visudo</p>
+<pre class=""lang-bash prettyprint-override""><code>╰─ sudo EDITOR=vi visudo             
+</code></pre>
+<p>Commenting the <code>%admin</code> line and adding the following line</p>
+<pre class=""lang-bash prettyprint-override""><code>╰─ sudo cat /etc/sudoers | grep admin
+# %admin                ALL = (ALL) ALL
+%admin ALL=(ALL) NOPASSWD: ALL
+</code></pre>
+<p>In case you get locked out of sudo, the following will help.</p>
+<p><a href=""https://apple.stackexchange.com/questions/317425/fixing-etc-sudoers-file"">Locked out of sudo ?</a></p>
+","5761011",""
+"62665586","62547923","2020-06-30 20:22:30","0","<p>Depending on how R is set up, this post might be helpful for you. You might need to configure the .Renviron file.</p>
+<p><a href=""https://stackoverflow.com/questions/50145643/unable-to-change-python-path-in-reticulate-r/60048094#60048094"">Unable to change python path in reticulate (R)</a></p>
+","4950753",""
+"63648621","62908594","2020-08-29 15:22:07","3","<p>Try the --name option</p>
+<pre><code>options: &gt;-
+  --health-cmd pg_isready
+  --health-interval 10s
+  --health-timeout 5s
+  --health-retries 5
+  --name postgres 
+</code></pre>
+<p><a href=""https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idservices"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idservices</a></p>
+<p>jobs.&lt;job_id&gt;.services.options: Additional Docker container resource options. For a list of options, see &quot;docker create options.&quot;</p>
+<p>Another solution I've seen is using last created container</p>
+<pre><code>docker exec -it $(docker ps --latest --quiet) bash
+</code></pre>
+","449683",""
+"63293712","63288356","2020-08-07 00:51:56","7","<p>I don't think you can use <code>workflow_dispatch</code> to add/update checks on a PR. This seems to be confirmed by <a href=""https://github.community/t/workflow-dispatch-does-not-update-commit-status/125981/2"" rel=""noreferrer"">this response</a> to a similar question on the community forums.</p>
+<p>Checks are only added/updated for the following events:</p>
+<ul>
+<li>pull_request</li>
+<li>pull_request_review</li>
+<li>pull_request_review_comment</li>
+<li>pull_request_target</li>
+<li>push</li>
+</ul>
+<p>So your manual operation needs to trigger one of these events to run. There are probably a number of different ways you can do this, depending on your use case. Just as an example, you could call the API to add a label and allow a <code>pull_request</code> workflow to execute on that type.</p>
+<pre><code>on:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+</code></pre>
+<p>The other thing to note is that the API call (or git push) must use a PAT instead of <code>GITHUB_TOKEN</code>. This is to <a href=""https://docs.github.com/en/actions/reference/events-that-trigger-workflows#triggering-new-workflows-using-a-personal-access-token"" rel=""noreferrer"">allow further workflows</a> to execute.</p>
+","11934042",""
+"75510242","63288356","2023-02-20 14:04:56","3","<p>It is possible with some workaround. First, you have to identify the PR that invoked your workflow. If you need to use the <code>workflow_dispatch</code> trigger event, you can pass this PR number as input parameter. Otherwise, you mentioned you trigger this workflow on a specific comment so you could also use the <code>issue_comment</code> event which will give you the PR number as <code>github.event.issue.pull_request</code>.</p>
+<p>Next, you have to find out the latest commit of this Pull Request. This depends on how your workflow got invoked:</p>
+<ul>
+<li>if you use the <code>issue_comment</code> event, you can use the <a href=""https://github.com/xt0rted/pull-request-comment-branch"" rel=""nofollow noreferrer"">xt0rted/pull-request-comment-branch</a> action to determine the right branch and commit</li>
+<li>if you use the <code>workflow_dispatch</code> event, you can use the <a href=""https://github.com/actions/github-script"" rel=""nofollow noreferrer"">actions/github-script</a> action to run some query to get the right commit for a given PR number</li>
+</ul>
+<p>Finally, you can use the <a href=""https://github.com/myrotvorets/set-commit-status-action"" rel=""nofollow noreferrer"">myrotvorets/set-commit-status-action</a> action to attach the workflow result as check on the latest commit of the PR.</p>
+<p>I wrote a blog post that describes this process in some more details: <a href=""https://dev.to/zirkelc/trigger-github-workflow-for-comment-on-pull-request-45l2"" rel=""nofollow noreferrer"">Trigger GitHub Workflow for Comments on Pull Request</a></p>
+","1967693",""
+"63955997","63952543","2020-09-18 12:41:25","3","<p>ok finally found solution</p>
+<p>first we need to set variable:</p>
+<pre><code>- name: Extract Branch Name
+      shell: bash
+      run: |
+        branchName=${GITHUB_REF#refs/heads/}
+        if [ $branchName = 'develop' ]; then additionalImageName='-develop'; else additionalImageName=''; fi
+        echo &quot;::set-output name=additionalImageName::$(echo $additionalImageName)&quot;
+      id: extract_branch
+</code></pre>
+<p>and then in creating docker container step:</p>
+<pre><code>- name: docker
+      uses: VaultVulp/gp-docker-action@1.1.6
+      with:
+        image-name: test-service${{ steps.extract_branch.outputs.additionalImageName }}
+</code></pre>
+<p>looks like only way to use some variable in image-name is by using steps.
+Anyway it works well.</p>
+","3244618",""
+"69397197","64078671","2021-09-30 18:24:04","0","<p>Unfortunately, my solution was not at all tidy. I had to path into the gem installation directory and directly reference the gem executable. Thankfully, the relative path doesn't change, so I could just hardcode it into the test script. Maybe there's a more elegant solution, but once I got it working, I just dropped it.</p>
+<p>And sorry if you're trying to reproduce this, but it was over a year ago and I left the company, so I don't have access to what the path was.</p>
+","630517",""
+"71230969","64078671","2022-02-23 03:13:45","0","<p>Jenkins -&gt; Manage Jenkins -&gt; Configure System -&gt; Global properties -&gt; Environment variables -&gt; Name: LC_ALL, Value: en_US.UTF-8</p>
+","7718603",""
+"73059178","64078671","2022-07-20 23:36:26","1","<ol>
+<li>I was facing the same issue while setting up <code>fastlane</code> to run my Xcode tests.</li>
+<li>Finally, solved the issue by adding PATH in <code>Jenkinsfile</code> as below.</li>
+<li>Note that <code>SampleProject-TestCase-Executions</code> is Sample app on my Desktop.</li>
+<li>Please find <a href=""https://github.com/BudhabhooshanPatil/Jenkin-demo-app"" rel=""nofollow noreferrer"">GitHub Demo App</a> for more info.</li>
+</ol>
+<pre><code>node {
+    stage &quot;Run Fast file&quot;    
+    sh '''
+    cd /Users/bhooshanpatil/Desktop/SampleProject-TestCase-Executions
+    export PATH=&quot;$PATH:/usr/local/bin:/usr/local/bin:/usr/local/sbin$:&quot;
+    fastlane scan
+    '''
+}
+</code></pre>
+","10279508",""
+"64173273","64169578","2020-10-02 14:27:46","2","<p>The error you are getting is because you aren't listening for incoming HTTP requests in your code or you're listening for incoming requests on the wrong port.</p>
+<p>As you can see documented in the <a href=""https://cloud.google.com/run/docs/reference/container-contract#port"" rel=""nofollow noreferrer"">Cloud Run container runtime</a>, your container must listen for incoming HTTP requests on the port that is defined by Cloud Run and provided in the <code>$PORT</code> environment variable.</p>
+<p>If this fails, the health check will fail to, and it would switch to an error state and the traffic will not be routed to the correct PORT.</p>
+<p>I would post an example for Node.js and as I can see you do not have specified anything related to the port:</p>
+<pre><code>const port = process.env.PORT || 8080;
+app.listen(port, () =&gt; {
+  console.log('Hello world listening on port', port);
+});
+</code></pre>
+","12391391",""
+"64272409","64272276","2020-10-09 00:33:54","1","<p>When you clone a repository with GitHub Actions, by default it clones it in a particular way:</p>
+<ul>
+<li>First, it uses the <code>--depth=1</code> option to make a shallow clone.</li>
+<li>Second, it clones only the single ref that you're using.</li>
+</ul>
+<p>Both of these result in a much smaller amount of data being cloned which makes runs potentially much faster.  However, in your case, this has a few problems that prevent it from working the way you want it:</p>
+<ul>
+<li>First, you cannot push from this shallow clone to a new repository because your Actions repository may lack objects needed for the push (resulting in “shallow update not allowed&quot;).</li>
+<li>Second, you haven't cloned any branch but the single one you're testing, so you're implicitly trying to delete every other branch.  However, you're not allowed to delete the default branch (in this case, <code>master</code>), so you get the error “refusing to delete the current branch”.</li>
+</ul>
+<p>What you want to do is fetch all history for all branches and tags, so you should pass an appropriate option:</p>
+<pre><code>- uses: actions/checkout@v2
+  with:
+    fetch-depth: 0
+</code></pre>
+<p>That will result in a full clone at the expense of increased time, but it will allow you to push your repository elsewhere.</p>
+","8705432",""
+"69922168","64359222","2021-11-11 01:23:49","1","<p>For the next person who runs into this -- this is basically just an issue with Azure SNAT and Maven interacting. Maven internally pools connections and Azure's SNAT closes them in a way that Java kinda can't see, and Github Actions (since GitHub is owned by Microsoft) runs in Azure.</p>
+<p>Anyway -- the fix with current Maven versions is to set a Maven parameter to dial down the TTL on the connection pool. If you need to use an older version, there are some other parameters you can use.</p>
+<p>So I added an env var to my workflow:</p>
+<pre class=""lang-yaml prettyprint-override""><code>MAVEN_OPTS: '-Dmaven.wagon.httpconnectionManager.ttlSeconds=120'
+</code></pre>
+<p>See also:</p>
+<ul>
+<li><a href=""https://maven.apache.org/configure.html"" rel=""nofollow noreferrer"">Configuring Maven</a> if you don't want to use MAVEN_OPTS</li>
+<li><a href=""https://issues.apache.org/jira/browse/WAGON-545?focusedCommentId=16755035&amp;page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-16755035"" rel=""nofollow noreferrer"">WAGON-545</a> and <a href=""https://issues.apache.org/jira/browse/WAGON-486"" rel=""nofollow noreferrer"">WAGON-486</a> if you want more information about the issue</li>
+<li><a href=""https://github.com/actions/virtual-environments/issues/1499"" rel=""nofollow noreferrer"">GH Actions Virtual Environments #1499</a> for a bit more on the GH side of things</li>
+</ul>
+","141042",""
+"64724369","64721253","2020-11-07 04:17:30","21","<p>I went down the road that <a href=""https://stackoverflow.com/users/3266847/benjamin-w"">Benjamin W.</a> was talking about with having <code>VERSION</code> in my environment vs just in that specific step.</p>
+<p>This worked for me to set the variable in one step, then use it in separate steps.</p>
+<pre><code>- name: Set variables
+  run: |
+    VER=$(cat VERSION)
+    echo &quot;VERSION=$VER&quot; &gt;&gt; $GITHUB_ENV
+
+- name: Build Docker Image
+  uses: docker/build-push-action@v2
+  with:
+    context: .
+    file: ${{ env.BASE_DIR }}/Dockerfile
+    load: true
+    tags: |
+      ${{ env.USER }}/${{ env.REPO }}:${{ env.VERSION }}
+      ${{ env.USER }}/${{ env.REPO }}:latest
+</code></pre>
+","10984961",""
+"68092042","64721253","2021-06-23 00:13:37","1","<p>As I want to re-use ENV_VAR between jobs, this is how I do it. I wish I could find a way to minimize this code.</p>
+<p>In this example, I use VARs from my Dockerfile. But it will work from any file.</p>
+<pre><code>  pre_build:
+    runs-on: ubuntu-20.04
+    steps:
+        ...
+      -
+        name: Save variables to disk
+        run: |
+          cat $(echo ${{ env.DOCKERFILE }}) | grep DOCKERHUB_USER= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/DOCKERHUB_USER
+          cat $(echo ${{ env.DOCKERFILE }}) | grep GITHUB_ORG= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/GITHUB_ORG
+          cat $(echo ${{ env.DOCKERFILE }}) | grep GITHUB_REGISTRY= | head -n 1 | grep -o '&quot;.*&quot;' | sed 's/&quot;//g' &gt; ~/varz/GITHUB_REGISTRY
+          echo &quot;$(cat ~/varz/DOCKERHUB_USER)/$(cat ~/varz/APP_NAME)&quot; &gt; ~/varz/DKR_PREFIX
+      - 
+        name: Set ALL variables for this job | à la sauce GitHub Actions
+        run: |
+          echo &quot;VERSION_HASH_DATE=$(cat ~/varz/VERSION_HASH_DATE)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_HASH_ONLY=$(cat ~/varz/VERSION_HASH_ONLY)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_CI=$(cat ~/varz/VERSION_CI)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_BRANCH=$(cat ~/varz/VERSION_BRANCH)&quot; &gt;&gt; $GITHUB_ENV
+      -
+        name: Show variables
+        run: |
+          echo &quot;${{ env.VERSION_HASH_DATE }} &lt; VERSION_HASH_DATE&quot;
+          echo &quot;${{ env.VERSION_HASH_ONLY }} &lt; VERSION_HASH_ONLY&quot;
+          echo &quot;${{ env.VERSION_CI }} &lt; VERSION_CI&quot;
+          echo &quot;${{ env.VERSION_BRANCH }} &lt; VERSION_BRANCH&quot;
+      - 
+        name: Upload variables as artifact
+        uses: actions/upload-artifact@master
+        with:
+          name: variables_on_disk
+          path: ~/varz
+
+  test_build:
+    needs: [pre_build]
+    runs-on: ubuntu-20.04
+    steps:
+       ...
+      - 
+        name: Job preparation | Download variables from artifact
+        uses: actions/download-artifact@master
+        with:
+          name: variables_on_disk
+          path: ~/varz
+      - 
+        name: Job preparation | Set variables for this job | à la sauce GitHub Actions
+        run: |
+          echo &quot;VERSION_HASH_DATE=$(cat ~/varz/VERSION_HASH_DATE)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_HASH_ONLY=$(cat ~/varz/VERSION_HASH_ONLY)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;VERSION_BRANCH=$(cat ~/varz/VERSION_BRANCH)&quot; &gt;&gt; $GITHUB_ENV
+          echo &quot;BRANCH_NAME=$(cat ~/varz/BRANCH_NAME)&quot; &gt;&gt; $GITHUB_ENV
+</code></pre>
+","5596289",""
+"64867540","64859065","2020-11-17 00:09:09","8","<p>It's because you're running the commands as the root user. Either create a new user using <code>sudo newuser {username}</code> or run the command <code>export {AGENT_ALLOW_RUNASROOT=&quot;1&quot;}</code> i recommend option 1 but both work just fine.</p>
+","13157630",""
+"64892206","64891521","2020-11-18 11:29:38","1","<p>Plese define <code>artifacts</code> in <code>ncipollo/release-action@v1</code> to you folder as</p>
+<blockquote>
+<p>artifacts: An optional set of paths representing artifacts to upload to the release. This may be a single path or a comma delimited list of paths (or globs).</p>
+</blockquote>
+<p>Looking at logs all seems to be fine because code was compiled:</p>
+<pre><code>2020-11-18T11:01:59.5831738Z chunk {} runtime.1d195ead05122679a08a.js (runtime) 2.3 kB [entry] [rendered]
+2020-11-18T11:01:59.5832939Z chunk {1} 1.c16b36d40a2635ee97c6.js () 174 kB  [rendered]
+2020-11-18T11:01:59.5833729Z chunk {2} 2.5449d2e89a98cbd134fb.js () 37.2 kB  [rendered]
+2020-11-18T11:01:59.5834534Z chunk {3} 3.fe05023c0dd4c02292ef.js () 53.6 kB  [rendered]
+2020-11-18T11:01:59.5835659Z chunk {4} light.blue.yale.a040718431090d476d1d.css (light.blue.yale) 168 kB [initial] [rendered]
+2020-11-18T11:01:59.5836819Z chunk {5} main.38262ff03d42f24493fc.js (main) 1.32 MB [initial] [rendered]
+2020-11-18T11:01:59.5837887Z chunk {6} polyfills.55cc3ce773551d941d32.js (polyfills) 36 kB [initial] [rendered]
+2020-11-18T11:01:59.5839256Z chunk {7} styles.d3fcf7ce8fd057dbb140.css (styles) 305 kB [initial] [rendered]
+2020-11-18T11:01:59.5840306Z chunk {8} 8.e0c916486616e1903c4b.js () 275 kB  [rendered]
+</code></pre>
+","2347999",""
+"65744334","64930068","2021-01-15 22:25:13","1","<p>There is a new Travis feature (in beta) that allows you to share files from one job with subsequent jobs in a build: <a href=""https://docs.travis-ci.com/user/using-workspaces/"" rel=""nofollow noreferrer"">workspaces</a></p>
+<pre class=""lang-yaml prettyprint-override""><code>jobs:
+  include:
+    - stage: warm_cache
+      script:
+        - echo &quot;foo&quot; &gt; foo.txt
+      workspaces:
+        create:
+          name: ws1
+          paths:
+            - foo.txt
+    - stage: use_cache
+      workspaces:
+        use: ws1
+      script:
+        - cat foo.txt || true
+</code></pre>
+<p>Also, SBT 1.4 allows you to push build artefacts to a Maven server and fetch then again later: <a href=""https://www.scala-sbt.org/1.x/docs/Remote-Caching.html"" rel=""nofollow noreferrer"">https://www.scala-sbt.org/1.x/docs/Remote-Caching.html</a></p>
+","4432837",""
+"65016048","65011370","2020-11-26 04:17:52","1","<p>The default value of <code>GOPATH</code> is <code>$HOME/go</code>.</p>
+<p>Your project folder is outside of this <code>GOPATH</code> hence the error.</p>
+<p>You have two ways to fix this problem.</p>
+<ol>
+<li>(Preferred) Update your project to use go.mod. It's the newer, nicer dependency management solution in go and doesn't require your project to be in <code>GOPATH</code>.</li>
+</ol>
+<p>Assuming you are using Go version newer than 1.12, Remove the <code>Gopkg.toml</code> and <code>Gopkg.lock</code> (if you have it).</p>
+<p>Run,</p>
+<p>a. <code>go mod init &lt;project-name&gt;</code> Replace <code>&lt;project-name&gt;</code> with the name of your project.</p>
+<p>b. Run <code>go mod tidy</code> and it'll add all the dependencies you are using in your project.</p>
+<p>c. Run <code>go build</code> once to make sure your project still builds. If it doesn't, You can add the missing dependencies manually in <code>go.mod</code>.</p>
+<p>Commit <code>go.mod</code> and <code>go.sum</code>(if you need deterministic builds).</p>
+<p>Removed this from your CI config,</p>
+<pre><code> if [ -f Gopkg.toml ]; then
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+              dep ensure
+          fi
+</code></pre>
+<p>and just build the project. It should work.</p>
+<ol start=""2"">
+<li>Set the <code>GOPATH</code> correctly in your CI config before calling <code>dep ensure</code>.  I <em>think</em> <code>GOPATH=/home/runner/work/project/project</code> should work but I am not aware of the exact specifics related to <code>GOPATH</code> so you'll just have to try.</li>
+</ol>
+","5805469",""
+"65301479","65170927","2020-12-15 07:13:40","2","<p>The <code>hashicorp/setup-terraform@v1</code> uses a wrapper to execute terraform and messes up the output when using redirection (like you do with shell pipe). There's an issue describing the problem <a href=""https://github.com/hashicorp/setup-terraform/issues/20"" rel=""nofollow noreferrer"">in their repo</a>.</p>
+<p>Disabling the wrapper will make it work but you'll lose some functionalities to reuse stdout, stderr and exit code from the github integration.</p>
+<pre><code> - name: Terraform setup
+   uses: hashicorp/setup-terraform@v1
+   with:
+    terraform_version: 0.13.5
+    terraform_wrapper: false
+</code></pre>
+","15361",""
+"65355741","65205928","2020-12-18 10:51:56","1","<p>I've solved my issues and this is an example github workflow for the github actions:</p>
+<pre><code>name: Multiple Environments Example
+
+on: [push, pull_request]
+
+jobs:
+  e2e-test-on-ubuntu-with-local-chrome:
+    runs-on: ubuntu-latest
+    #runs-on: macos-latest
+    #runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup
+        run: npm install
+      - name: Test
+        run: npm run clear-test -- &quot;wdio-configs/wdio.conf.chrome.chromedriver.headless.js --cucumberOpts.tagExpression=@myTests&quot;
+        env:
+          ENV_PATH: environment/QS
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v2
+        with:
+          name: reports
+          path: tests/reports/
+      - name: Upload Logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: logs
+          path: log/
+</code></pre>
+","4062803",""
+"65357936","65357083","2020-12-18 13:31:15","0","<p>Looks like adding is the second the step:</p>
+<pre><code>    - name: Setting Ghostscript paths (Windows)
+      shell: bash
+      run: |
+        echo &quot;C:/Program Files (x86)/gs/gs9.53.3/bin/&quot; &gt;&gt; $GITHUB_PATH
+        echo &quot;C:/Program Files/gs/gs9.53.3/bin/&quot; &gt;&gt; $GITHUB_PATH
+        export PATH=&quot;/c/Program Files (x86)/gs/gs9.53.3/bin/:$PATH&quot;
+        export PATH=&quot;/c/Program Files/gs/gs9.53.3/bin/:$PATH&quot;
+      if: matrix.config.os == 'windows-latest'
+</code></pre>
+<p>makes gswin64c available.</p>
+","1657886",""
+"65821159","65820392","2021-01-21 04:21:14","2","<p>Based on the comments.</p>
+<p>The solution was that the env variable set were incorrect. The correct ones are <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_DEFAULT_REGION</code> as shown in the <a href=""https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html"" rel=""nofollow noreferrer"">docs</a>.</p>
+","248823",""
+"70453429","65893608","2021-12-22 18:12:06","18","<p>I just tested a <a href=""https://github.com/GuillaumeFalourd/poc-github-actions/blob/main/.github/workflows/workflow-tester19.yml"" rel=""noreferrer"">simple workflow here</a> (same as below) to use the virtual env.</p>
+<p>It doesn't seem you need the <code>sudo apt install python3-env</code> command when using the <code>actions/checkout</code> and the <code>setup-python</code> actions to create the virtual env using the <code>python3.8 -m venv env</code> command.</p>
+<pre class=""lang-yaml prettyprint-override""><code>on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Run Python commands
+        run: |
+          pip install --upgrade pip
+          python3.8 -m venv env
+          source env/bin/activate
+          echo &quot;VIRTUAL ENV:&quot; $VIRTUAL_ENV
+</code></pre>
+<p>Returned me <code>VIRTUAL ENV: /home/runner/work/poc-github-actions/poc-github-actions/env</code> on the <a href=""https://github.com/GuillaumeFalourd/poc-github-actions/runs/4610138792?check_suite_focus=true"" rel=""noreferrer"">workflow run logs</a>.</p>
+","8496462",""
+"65925526","65925430","2021-01-27 18:49:59","1","<p>Try adding this to your DockerFile:</p>
+<pre><code>RUN apt-get update &amp;&amp; apt-get install python
+</code></pre>
+","7890795",""
+"66093697","66088277","2021-02-07 22:19:02","2","<p>Thanks for sharing this.  I have precisely the same problems.</p>
+<p>I added the following in my <code>Dockerfile</code></p>
+<pre><code>RUN sed -i 's/\tif \[\[ -r $MAKEPKG_CONF \]\]; then/\tif \[\[ -f $MAKEPKG_CONF \]\]; then/' /usr/share/makepkg/util/config.sh
+</code></pre>
+<p>which replaces the check for read permission (<code>-r</code>) for the check whether the file exists and is a regular file (<code>-f</code>).</p>
+<p>now my github action gets over this particular location, but fails with the next check:</p>
+<pre><code>==&gt; ERROR: You do not have write permission for the directory $BUILDDIR (/tmp/aurutils).
+    Aborting...
+</code></pre>
+<p>This is not a solution and does not answer what's the underlying issue, but I hope it helps anyways.</p>
+","2165903",""
+"66184907","66088277","2021-02-13 12:04:31","1","<p>This issue is caused by using glibc &gt;= 2.33 on the container and an outdated version of the Docker engine on the host.</p>
+<p>You can fix it by patching glibc in your container:</p>
+<pre class=""lang-sh prettyprint-override""><code>patched_glibc=glibc-linux4-2.33-4-x86_64.pkg.tar.zst
+curl -LO https://repo.archlinuxcn.org/x86_64/$patched_glibc
+bsdtar -C / -xvf $patched_glibc
+</code></pre>
+<p>Thanks to <a href=""https://github.com/lxqt/lxqt-panel/pull/1562/files"" rel=""nofollow noreferrer"">lxqt-panel</a> for the workaround.</p>
+","2599002",""
+"66931662","66273666","2021-04-03 13:24:35","0","<p>Use <code>sudo yarn build</code> instead of <code>yarn build</code>.</p>
+","6389206",""
+"67018842","66273666","2021-04-09 09:48:00","1","<p>You should follow that, use cmd not use run</p>
+<pre><code>name: CI
+on: [push]
+jobs:
+  build:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: borales/actions-yarn@v2.0.0
+        with:
+          cmd: install # will run `yarn install` command
+      - uses: borales/actions-yarn@v2.0.0
+        with:
+          cmd: build # will run `yarn build` command
+</code></pre>
+<p><a href=""https://github.com/marketplace/actions/github-action-for-yarn"" rel=""nofollow noreferrer"">https://github.com/marketplace/actions/github-action-for-yarn</a></p>
+","7720164",""
+"73303371","66273666","2022-08-10 08:51:36","0","<p>I had similar problems in github actions, it turned out that some previous step caused a directory to be owned by the root user.</p>
+<pre class=""lang-bash prettyprint-override""><code>sudo chown $USER invoice-app/build
+</code></pre>
+<p>fixed it.</p>
+<p>The <a href=""https://github.com/marketplace/actions/debugging-with-ssh"" rel=""nofollow noreferrer"">ssh debug action</a> was super helpful in finding the problem, I highly recommend it if you're having these kinds of problems.</p>
+","4575363",""
+"66445231","66358295","2021-03-02 18:38:25","0","<p>I fixed my problem by setting the <code>.git/config</code> file to what my local <code>.git/config</code> file was, and that solved the problem.  I don't know what part of the config file was causing the error, but I do know there was a problem with it.</p>
+","14539510",""
+"66358721","66358482","2021-02-24 20:56:23","1","<p>When you pass a image to a job, it will execute the <code>steps</code> defined in your job inside this container. Your container image only provides the environment in which your steps will be executed. You lose control of the entrypoint and arguments.</p>
+<p>If you only want to run your container as a single step you could do something like this instead:</p>
+<pre class=""lang-yaml prettyprint-override""><code>jobs:
+  my-job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker://myimage:latest
+</code></pre>
+<p>or if you want to overwrite it:</p>
+<pre class=""lang-yaml prettyprint-override""><code>    steps:
+      - uses: docker://myimage:latest
+        with:
+          entrypoint: /run.sh
+          args: --help
+</code></pre>
+","3719845",""
+"66485882","66358482","2021-03-05 02:26:57","1","<p>I've settled along the lines below. Not ideal/DRY, as the <code>run.sh</code> entrypoint script has to be duplicated from the Docker container and kept up to date. Also, the <a href=""https://github.com/actions/upload-artifact"" rel=""nofollow noreferrer"">upload-artifact</a> GitHub Actions does not preserve executable bits, so have to zip everything in a tar file.</p>
+<pre><code>jobs:
+  build:
+    container:
+      image: XX/compiler:${{ matrix.DOCKER_TAG }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: ./.github/scripts/run.sh ./.github/scripts/build.sh
+      - uses: actions/upload-artifact@v2
+        with:
+          name: build-artifact
+          path: 'build-*.tar.bz2'
+          retention-days: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        DOCKER_TAG: [gcc, nvhpc, intel]
+        include:
+          - DOCKER_TAG: gcc
+            FC: gfortran
+          - DOCKER_TAG: nvhpc
+            FC: nvfortran
+          - DOCKER_TAG: intel
+            FC: ifort
+</code></pre>
+","661775",""
+"66478679","66438446","2021-03-04 16:02:21","0","<p>So, I managed to solve the issue myself. The <code>checkout@v2</code> action does only allow relative paths, however, we can just clone the dependency manually.</p>
+<pre><code>- name: Checkout dependencies
+  run: |
+      git clone https://${{ secrets.GIT_ACCESS_TOKEN }}@github.com/myorg/dependency.git ${GOROOT}/src/dependency
+</code></pre>
+<p>In this way, it will also work with different Go versions yielding in a different GOROOT.</p>
+<p>The full pipeline steps:</p>
+<pre><code>steps:
+## sets up go based on the version
+- name: Install Go
+  uses: actions/setup-go@v2
+  with:
+    go-version: ${{ matrix.go-version }}
+  env:
+    GO111MODULE: &quot;on&quot;
+- name: Checkout dependencies
+  run: |
+    git clone https://${{ secrets.GIT_ACCESS_TOKEN }}@github.com/myorg/dependency.git 
+
+## checks out our code locally so we can work with the files
+- name: Checkout code
+  uses: actions/checkout@v2
+
+## runs a build
+- name: Build
+  run: go build src
+
+## runs go test ./...
+- name: Test
+  run: go test ./...
+</code></pre>
+","5679455",""
+"66922092","66918575","2021-04-02 16:09:15","33","<p>When you want to execute files from the current repository, you need to use the <a href=""https://github.com/actions/checkout"" rel=""noreferrer"">actions/checkout</a></p>
+<p>This will allow you to access the repository <code>$github_workspace</code> (one of <a href=""https://docs.github.com/en/actions/reference/environment-variables"" rel=""noreferrer"">Github environment variables</a>) in your workflow.</p>
+<p>For example, considering that your <code>Makefile</code> file is at the root of the repository, you would use something like this:</p>
+<pre><code>   name: python-app
+
+   on:
+     push:
+       branches: [ master ]
+     pull_request:
+       branches: [ master ]
+
+   jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+      - name: checkout repo
+        uses: actions/checkout@main
+      - name: build application
+        run: make build
+</code></pre>
+<p><a href=""https://github.com/GuillaumeFalourd/poc-github-actions/blob/main/.github/workflows/03-python-script-workflow.yml"" rel=""noreferrer"">Here</a> is another workflow example from a personal repository, following the same logic if you want to execute a specific script to perform any operation.</p>
+","8496462",""
+"67372821","67343722","2021-05-03 16:54:13","0","<p>It looks like you're trying to read environment variables instead of reading GitHub action secrets.</p>
+<p>Secrets should be read as following: ${{ secrets.SecretName }}, for example:</p>
+<pre><code>jfrog config add MyArtifactory --artifactory-url ${{ secrets.ARTIFACTORY_URL }} --user ${{ secrets.ARTIFACTORY_USER }} --password ${{ secrets.ARTIFACTORY_PASS }}
+</code></pre>
+<p>Read more about secrets here:
+<a href=""https://docs.github.com/en/actions/reference/encrypted-secrets#using-encrypted-secrets-in-a-workflow"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/reference/encrypted-secrets#using-encrypted-secrets-in-a-workflow</a></p>
+","4233342",""
+"67736697","67720527","2021-05-28 09:54:20","1","<p>The kustomization file, as explained in it's <a href=""https://github.com/kubernetes-sigs/kustomize#usage"" rel=""nofollow noreferrer"">repository</a>, should be in the next file structure:</p>
+<pre><code>~/someApp
+├── deployment.yaml
+├── kustomization.yaml
+└── service.yaml
+</code></pre>
+","15168009",""
+"72605051","67786526","2022-06-13 15:02:47","1","<p>Your workflow doesn't build the APK, and therefore, there's no <code>build/app/outputs/apk/release/*.apk</code> file. So the release action doesn't find the location of the <em>artifacts</em>. Here is the workflow you can use to modify yours and tweak it as you wish:</p>
+<pre><code># This is a basic workflow to help you get started with Actions
+
+name: Build Flutter APK
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the &quot;develop&quot; branch
+  push:
+    branches: [&quot;develop&quot;]
+    tags:
+      - &quot;v*&quot;
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called &quot;build&quot;
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v1
+        with:
+          java-version: &quot;12.x&quot;
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v1
+        with:
+          channel: &quot;beta&quot;
+
+      - name: Decode android/neumodore_key.jks
+        run: echo &quot;${{ secrets.KEYSTORE_JKS_PROD }}&quot; | base64 --decode &gt; android/keystore.jks
+
+      - name: Decode android/key.properties
+        run: echo &quot;${{ secrets.KEY_PROPERTIES_PROD }}&quot; | base64 --decode &gt; android/key.properties
+
+      - name: Pub Get Packages
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk 
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.10.0
+        with:
+          artifacts: &quot;build/app/outputs/apk/release/*.apk&quot;
+</code></pre>
+","9844964",""
+"67884515","67800532","2021-06-08 08:57:56","1","<p>looks like this was due to an older version of kotlin-serialization dependency in kotlin-datetime updating to kotlin-datetime 0.2.1 fixed it</p>
+","668195",""
+"67862043","67861379","2021-06-06 17:47:04","8","<p>Codecov has some heisenberg issues. If you don't have a token, please add one otherwise try to:</p>
+<ul>
+<li>Force-push to retrigger Codecov</li>
+<li>Rotate your token.</li>
+</ul>
+","3837675",""
+"67862910","67861379","2021-06-06 19:24:33","4","<p>Refreshing my codecov token and reinstalling the plugin worked for me.</p>
+","1354502",""
+"67895756","67861379","2021-06-08 23:32:38","2","<p>I ran into this issue today.</p>
+<p>Seems related to <a href=""https://github.com/codecov/codecov-action/issues/330"" rel=""nofollow noreferrer"">Issue #330</a> being tracked from their GitHub page.</p>
+<p>Last comment (as of this writing) suggests that the issue should have been fixed about an hour ago, but my latest PRs still ran into it. I'll post an update if I can confirm it's fixed for me.</p>
+<p><strong>UPDATE:</strong> This has been fixed with <a href=""https://github.com/codecov/codecov-action/releases/tag/v1.5.2"" rel=""nofollow noreferrer"">release of version 1.5.2</a> of the codecov action.</p>
+","9447571",""
+"69578040","67861379","2021-10-14 22:26:04","3","<p><strong>NOTE</strong>:
+This answer refers to the new <a href=""https://about.codecov.io/blog/introducing-codecovs-new-uploader/"" rel=""nofollow noreferrer"">uploader</a>. You can also use <code>codecov</code>'s <a href=""https://github.com/codecov/codecov-action"" rel=""nofollow noreferrer"">action</a> instead.</p>
+<p>I had failing <a href=""https://github.com/Nelson-Gon/pyfdc/runs/3900111676?check_suite_focus=true"" rel=""nofollow noreferrer"">builds</a> although I had <code>steps</code> setup correctly. In my case what fixed the builds was to change the &quot;alpine&quot; to &quot;linux&quot; in the uploader link and explicitly provide an environmental variable named <code>CODECOV_TOKEN</code>.</p>
+<pre><code>- name: Upload reports to codecov
+      env:
+        CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
+      run: | 
+       curl -Os https://uploader.codecov.io/latest/linux/codecov
+       find . -iregex &quot;codecov.*&quot;
+       chmod +x codecov 
+       ./codecov -t ${CODECOV_TOKEN}
+</code></pre>
+<p>See the entire workflow file at <a href=""https://github.com/Nelson-Gon/pyfdc/blob/master/.github/workflows/build-package.yaml"" rel=""nofollow noreferrer"">this</a> repo.</p>
+","10323798",""
+"70158346","67865682","2021-11-29 16:52:16","1","<p>I did it this way to run env <code>❯ sudo env RUNNER_ALLOW_RUNASROOT=&quot;1&quot; ./run.sh</code></p>
+<p>for the config just keep the same pattern, put the <code>env</code> at the beginning.</p>
+","16338658",""
+"74459946","67989505","2022-11-16 11:49:12","0","<p>For anyone looking for this, this has to do with <strong>registry nginx body limit</strong>.</p>
+<p>As referenced here: <a href=""https://stackoverflow.com/questions/35122918/docker-push-error-413-request-entity-too-large"">Docker push error &quot;413 Request Entity Too Large&quot;</a></p>
+","13853406",""
+"68918609","68005219","2021-08-25 07:30:05","3","<p>You cannot use the 3-legged variant of OAuth2.0 (aka &quot;web-application flow&quot;) in a headless environment like Github Actions.</p>
+<p>If you want to use OAuth (I list other possibilities below), then you need to utilize what gitlab calls the &quot;device-flow&quot;. See <a href=""https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#device-flow"" rel=""nofollow noreferrer"">github documentation</a>.</p>
+<p>In this flow, there is no redirect to a given URL, so the app does not need a browser window. Instead it displays a code to the user. The user must the enter that code on a fixed URL (<a href=""https://github.com/login/device"" rel=""nofollow noreferrer"">https://github.com/login/device</a>). As soon as this is done, the app can request the authentication token. (So the app must keep polling until the user has entered the code).</p>
+<p>Unfortunately, <code>httr</code> does not have nice wrapper functions for this variant, so you have to do the calls yourself. It can work like this:</p>
+<pre><code>library(httr)
+
+
+
+app_id &lt;- &quot;*redacted*&quot;
+
+
+r &lt;- POST(&quot;https://github.com/login/device/code&quot;, 
+          body = list(
+            client_id = app_id,
+            scope = &quot;user repo delete_repo&quot; #Scope must be given! https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps
+))
+
+
+device_code &lt;- content(r)$device_code
+
+print(paste0(&quot;Enter the code  &quot;, content(r)$user_code, &quot;  at &quot;, content(r)$verification_uri))
+
+
+## NOTE: In reality this request has to run in a loop, until the user has entered the code und the request succeeds.
+##       For the demo we can execute it manually after the code has been entered.
+r &lt;- POST(&quot;https://github.com/login/oauth/access_token&quot;, 
+          body = list(
+            client_id = app_id,
+            device_code = device_code,
+            grant_type = &quot;urn:ietf:params:oauth:grant-type:device_code&quot;
+          ))
+
+token &lt;- content(r)$access_token
+
+## create and delete a private testrepository to check if everything worked
+r &lt;- 
+  POST(&quot;https://api.github.com/user/repos&quot;,
+       add_headers(Authorization = paste(&quot;token&quot;, token)),
+       body = list(name = &quot;testrepo&quot;,
+                 private = TRUE,
+                 auto_init = FALSE), 
+       encode = &quot;json&quot;)
+
+
+r &lt;- DELETE(paste0(&quot;https://api.github.com/repos/&quot;, content(r)$full_name), 
+       add_headers(Authorization = paste(&quot;token&quot;, token)))
+</code></pre>
+<p>I have seen that there is <code>httr2</code>, and that it offers convenience functions for this flow. I have however never used it and do not know if it already works reliable. See <a href=""https://httr2.r-lib.org/reference/req_oauth_device.html"" rel=""nofollow noreferrer"">here</a>.</p>
+<p>Since this flow still requires user interaction, you may be better of with one of the following variants (I do not know if they fit your use case.):</p>
+<ol>
+<li><p><strong>Basic Auth:</strong>
+You can define what github calls a &quot;personal access token&quot; beforehand. With this token you can authenticate without further interaction. Creation is described <a href=""https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token"" rel=""nofollow noreferrer"">here</a>. In R you can use it most easily together with <code>httr::authenticate</code>.</p>
+</li>
+<li><p><strong>GITHUB_TOKEN:</strong>
+Github automatically creates special secrets specifically Github Actions. These can be used to execute actions in the containing repository. For more info see <a href=""https://docs.github.com/en/actions/reference/authentication-in-a-workflow"" rel=""nofollow noreferrer"">here</a>.</p>
+</li>
+</ol>
+","6664578",""
+"76352843","68108398","2023-05-28 17:53:02","2","<p>Service discovery within GitHub seems to have implementation details that have not made it to self-hosted runners.</p>
+<p>I found that self hosted jobs should access the MySQL service via <code>172.17.0.1</code> (the host address for default networking in Docker..?), and use service discovery to fetch the port.</p>
+<p>More information regarding accessing the gateway host in ECS can be found here: <a href=""https://github.com/aws/containers-roadmap/issues/165"" rel=""nofollow noreferrer"">https://github.com/aws/containers-roadmap/issues/165</a></p>
+<pre><code>name: Build
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: self-hosted
+
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_DATABASE: acme_test
+          MYSQL_ROOT_PASSWORD: secret
+        ports:
+          - 33306:3306
+        options: &gt;-
+          --health-cmd=&quot;mysqladmin ping&quot;
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:       
+      - name: Verify MySQL connection
+        run: |
+          sudo apt update
+          sudo apt install -y mysql-client
+          mysql --version
+          mysql \
+            --host 172.17.0.1 \
+            --port ${{ job.services.mysql.ports['3306'] }} \
+            -uroot
+            -psecret -e &quot;SHOW DATABASES;&quot;
+</code></pre>
+","700439",""
+"68166086","68136219","2021-06-28 15:28:13","1","<p><strong><code>For npm error</code>:-</strong></p>
+<p>Try with Create a new file inside your(VS) project with <code>.env</code>
+Then inside the <code>.env</code> file write this following code and save it.</p>
+<blockquote>
+<p>`SKIP_PREFLIGHT_CHECK=true</p>
+</blockquote>
+<p>The above command will help you in resolving the <code>npm error.</code>
+After successfully create then try to start the npm and check. This can be work for your issue.</p>
+<p>Or, For more information about  <strong>configuring your node.js app to azure web app</strong> Refer this <a href=""https://learn.microsoft.com/en-us/azure/app-service/configure-language-nodejs?pivots=platform-linux"" rel=""nofollow noreferrer"">MS Doc</a>.</p>
+<p>Deploy the <strong>node.js app to App Service from  your local Git</strong> repository to Azure. Click <a href=""https://learn.microsoft.com/en-us/azure/developer/javascript/tutorial/tutorial-vscode-azure-cli-node/tutorial-vscode-azure-cli-node-04"" rel=""nofollow noreferrer"">here</a>.</p>
+","15969165",""
+"75645087","68136219","2023-03-05 20:18:03","1","<p>I was also getting the same error while deploying my react app on azure static web app service.</p>
+<p>The error occurs because your code may be having warnings that will fail your build. In your .yml file, add an env setting, and inside that, make CI: false like this:</p>
+<pre><code>jobs:
+  build_and_deploy_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' &amp;&amp; github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    env:
+      CI: false
+    steps:
+</code></pre>
+","21168119",""
+"68313303","68303502","2021-07-09 08:06:23","1","<p>I actually found the problem
+I was running the workflow locally using <a href=""https://github.com/nektos/act"" rel=""nofollow noreferrer"">https://github.com/nektos/act</a> and that appears to be the problem.
+When I did test it under Github, the outcome and every step context is working as intended.</p>
+<p>Thank you.</p>
+","14103794",""
+"76931465","68634487","2023-08-18 17:29:34","0","<p>Instead of below this line</p>
+<pre><code>run: echo MOCK_USERNAME=&quot;$MOCK_USERNAME&quot; &gt; ./local.properties
+</code></pre>
+<p>Use below line</p>
+<pre><code>run: echo 'MOCK_USERNAME=${{ secrets.USER }}' &gt; ./local.properties
+</code></pre>
+<p>Apply this pattern for others secrets  too.</p>
+","1292557",""
+"68694219","68692017","2021-08-07 16:29:51","8","<p>You can add this <a href=""https://github.com/webfactory/ssh-agent"" rel=""noreferrer"">action</a> after your checkout step and GitHub can access your private repo dependancy.</p>
+<p>Note:- Make sure to add a server's private key as a secret, public key to GitHub SSH keys and Please replace your private repo URL from https+auth_token to SSH.
+<code>ssh://git@github.com/your_group/your_project.git</code></p>
+","16414425",""
+"76191835","68692017","2023-05-07 01:16:24","7","<p>An easiest way to solve this problem is using the git <code>url.insteadOf</code> feature.</p>
+<p>First of all, create a <code>.cargo/config.toml</code> file in your project root and add this (this force cargo to use git cli instead of libgit2):</p>
+<pre><code># .cargo/config.toml
+[net]
+git-fetch-with-cli = true
+</code></pre>
+<p>Now, assuming that you have created a personal access token and added it to the (for example) <code>GIT_CREDENTIALS</code> repository environment variable:</p>
+<pre><code># Cargo.toml
+[dependencies]
+b = { git = &quot;https://github.com/me/b.git&quot; }
+</code></pre>
+<p>You can do this inside your CI before any cargo command:</p>
+<pre><code># my_action.yaml
+git config --global url.&quot;https://${{ secrets.GIT_CREDENTIALS }}@github.com&quot;.insteadOf https://github.com
+</code></pre>
+<p><em>OR:</em></p>
+<p>Alternatively, commonly is better for the developer to use ssh instead of https to fetch git dependencies. In this case, you can do:</p>
+<pre><code># Cargo.toml
+[dependencies]
+b = { git = &quot;ssh://git@github.com/me/b.git&quot; }
+</code></pre>
+<p>In CI will be:</p>
+<pre><code># my_action.yaml
+git config --global url.&quot;https://${{ secrets.GIT_CREDENTIALS }}@github.com&quot;.insteadOf ssh://git@github.com
+</code></pre>
+<p>This will override the url adding the token and allowing you to fetch the dependencies using https. <strong>Reminder</strong>: don't forget the <code>git-fetch-with-cli = true</code> configuration.</p>
+","9607657",""
+"68766063","68759913","2021-08-13 02:21:19","0","<p>Tried the code you provided and it worked for me with no issue. Not sure what the problem is on your side. Are you running this on a GitHub-provided runner or are you self-hosting one? Can't gauge that since you job description is missing. Also do you have a link to the repository maybe?</p>
+<p>Something to try would be to add the <a href=""https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idconcurrency"" rel=""nofollow noreferrer"">concurrency key on the job level instead</a> of the global level. Maybe that changes things for you</p>
+","5798347",""
+"68868105","68812228","2021-08-20 21:12:21","0","<p>Figured it out.</p>
+<p>The component was calling &quot;DottedNoteBook&quot; but the file name is &quot;DottedNotebook.vue&quot;. (Different case for the letter &quot;B&quot;.)</p>
+<p>I'm not sure why that case issue never came up before or preventing compiling outside of the GitHub Actions, but that was the issue. Thanks, @Tarkan for making me look closer at that.</p>
+","523530",""
+"68873450","68873088","2021-08-21 13:28:55","4","<p>There is a missing permission for the user user/service-account-ecr-push:</p>
+<pre><code>User: arn:aws:iam::***:user/service-account-ecr-push 
+is not authorized to perform: ecs:RegisterTaskDefinition
+on resource: *
+</code></pre>
+<p>It's not related to the role. It's the IAM user permissions that are not correct. The user needs the <code>ecs:RegisterTaskDefinition</code> in order to do the operation.</p>
+<p>Try adding the following permission to the above user:</p>
+<pre><code>{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Action&quot;: [
+        &quot;ecs:RegisterTaskDefinition&quot;,
+        &quot;ecs:ListTaskDefinitions&quot;,
+        &quot;ecs:DescribeTaskDefinition&quot;
+      ],
+      &quot;Resource&quot;: [
+        &quot;*&quot;
+      ]
+    }
+  ]
+}
+
+</code></pre>
+<p>For more information on this policy see <a href=""https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security_iam_id-based-policy-examples.html#IAM_task_definition_policies"" rel=""nofollow noreferrer"">https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security_iam_id-based-policy-examples.html#IAM_task_definition_policies</a></p>
+","5451492",""
+"68910345","68873088","2021-08-24 15:47:00","1","<p>The issue got resolved by adding the <code>AmazonEC2ContainerServiceforEC2Role</code> policy to the <code>ecsInstanceRole</code> role as per the AWS docs <a href=""https://docs.aws.amazon.com/AmazonECS/latest/developerguide/instance_IAM_role.html"" rel=""nofollow noreferrer"">here</a></p>
+","10337498",""
+"68892533","68887428","2021-08-23 12:15:59","0","<p>I forked your repository and updated <a href=""https://github.com/krishdevdb/Alphasians-AINA/blob/main/.github/workflows/nodejs.yml"" rel=""nofollow noreferrer"">your workflow file</a> installing <code>discord.js-comando</code> manually on another step before the <code>npm ci</code> command, after removing it from the <code>package.json</code> file.</p>
+<pre class=""lang-yaml prettyprint-override""><code>      - run: npm install discord.js@12 discord.js-commando
+
+      - name: Install Dependencies
+        run: npm ci
+</code></pre>
+<p>And the workflow ran successfully.</p>
+<ul>
+<li><a href=""https://github.com/GuillaumeFalourd/Alphasians-AINA/blob/develop/package.json"" rel=""nofollow noreferrer"">updated package.json</a></li>
+<li><a href=""https://github.com/GuillaumeFalourd/Alphasians-AINA/blob/develop/.github/workflows/nodejs.yml"" rel=""nofollow noreferrer"">forked workflow file</a></li>
+<li><a href=""https://github.com/GuillaumeFalourd/Alphasians-AINA/runs/3433095832?check_suite_focus=true"" rel=""nofollow noreferrer"">new workflow run</a></li>
+</ul>
+","8496462",""
+"68947628","68938010","2021-08-27 03:17:41","0","<blockquote>
+<p>I don't how to fix that to push the commit to the branch itself connected to the tag as i need to update the kustomize.yaml there after each building</p>
+</blockquote>
+<p>As far as Git itself is concerned, there is no connection between a branch name and a tag name.</p>
+<p>At the Git level, <em>any</em> name—any reference—is simply a name that stores a hash ID.  <em>Branch</em> names in particular are constrained to store only <em>commit</em> hash IDs, while tag names can store the hash ID of any internal Git object.  A tag is said to be a <em>lightweight</em> tag if it stores a commit hash ID, or an <em>annotated</em> tag if it stores the hash ID of a tag object.  This tag object then typically stores the hash ID of some commit.</p>
+<p>You can use <code>git branch --points-at</code> to find branch names that select some particular commit, and <code>git tag --points-at</code> to find tag names that select some particular commit.  For details, see the <a href=""https://git-scm.com/docs/git-branch"" rel=""nofollow noreferrer""><code>git branch</code></a> and <a href=""https://git-scm.com/docs/git-tag"" rel=""nofollow noreferrer""><code>git tag</code></a> documentation.</p>
+<p>Note that you can give <code>git tag</code> the <em>commit</em> hash ID here, and it still finds annotated tags.  Technically, it finds the annotated tag regardless of whether you name the tag object itself, or its target commit:</p>
+<pre class=""lang-none prettyprint-override""><code>$ git rev-parse v2.3.0
+42de6ed0c4c5c2a184b25ffeb4936af8226ccad1
+$ git rev-parse v2.3.0^{commit}
+9874fca7122563e28d699a911404fc49d2a24f1c
+$ git tag --points-at 42de6ed0c4c5c2a184b25ffeb4936af8226ccad1
+v2.3.0
+$ git tag --points-at 9874fca7122563e28d699a911404fc49d2a24f1c
+v2.3.0
+</code></pre>
+<p>But if you're trying to find which <em>branch</em> names—there may be anywhere from none to many—identify some particular <em>commit</em> that you find by a tag, you'll definitely need to resolve the tag name to a commit hash ID first, before running <code>git branch --points-at</code>.</p>
+<p>Regardless of all of that, your overall plan seems rather ill-founded to me.  Remember that the <em>purpose</em> of a <em>tag name</em> is to identify one specific commit for all time.  A raw hash ID will do that too, but the tag name provides two important features that the raw hash ID doesn't:</p>
+<ul>
+<li><p>It is at least potentially human-readable, and can have semantics, such as a <a href=""https://semver.org/"" rel=""nofollow noreferrer"">semver</a> part.</p>
+</li>
+<li><p>It gives you the ability to <em>sign</em> the commit without actually signing each commit.  That is, you can provide a GPG or other digital signature for the <em>tagged</em> commit, without having to use GPG or other digital signatures on every commit (which is in most cases more harmful than useful: signing just the tags, while in some sense less secure, is far more <em>usable</em>, and a key to getting effective security is to balance the pain level with the getting-work-done level, so that people actually <em>use</em> it).</p>
+</li>
+</ul>
+<p>Meanwhile, the <em>purpose</em> of a <em>branch</em> name is to allow something—humans, computers, or sometimes both—to find some particular but <em>changeable</em> commit.  So we assign a branch name to the <em>tip commit</em> of some chain of commits, to say <em>this is our best commit so far</em>.  Then, as we improve things, we add <em>new</em> commits to the chain, and <em>move the branch name</em>.</p>
+<p>What this all means for a formal release process is that you would not <em>tag</em> a <em>release candidate</em> unless it's going to a wider audience.  You would mark this release candidate with a <em>branch name</em>.  You would then build it and test it, and if it passes internal testing, you might <em>then</em> tag it as a release candidate, perhaps <em>after</em> updating some sort of build customization.</p>
+<p>In other words, <em>you would never customize a tagged version</em>.  You always customize from a <em>branch</em>—perhaps a particular branch pattern, but a branch.  Then you might tag the customized version, provided it's ready for candidacy.  If it's sufficiently good, it gets authorized as a release or &quot;wide RC&quot; (something that goes outside the local organization) that is signed and verified (so that those outside the organization can see that it is trusted, and by whom).  And of course, whoever adds a signature should make sure that the trust chain—the verification made at each step—is valid and unbroken.</p>
+","1256452",""
+"76993117","69255724","2023-08-28 13:11:13","1","<p>You should tell docker run to <a href=""https://docs.docker.com/engine/reference/commandline/run/#publish"" rel=""nofollow noreferrer"">expose</a> the port. Also, why do you fork the shell with <code>&amp;</code>? You can specify the <a href=""https://docs.docker.com/engine/reference/commandline/run/#options"" rel=""nofollow noreferrer""><code>--detach</code> option</a> instead.</p>
+<pre><code>docker run -p 127.0.0.1:8080:8080 -d dashboard:${{ github.run_id }}-test
+</code></pre>
+<p>To further improve your CI, I would recommend to use Docker Compose instead, use a <a href=""https://docs.docker.com/compose/compose-file/05-services/#healthcheck"" rel=""nofollow noreferrer"">health check</a> and the <a href=""https://docs.docker.com/engine/reference/commandline/compose_up/"" rel=""nofollow noreferrer""><code>--wait</code> option for <code>docker compose up</code></a>.  You can also add <a href=""https://docs.docker.com/compose/compose-file/build/"" rel=""nofollow noreferrer"">build instructions</a> to the compose file and <a href=""https://docs.docker.com/compose/compose-file/05-services/#ports"" rel=""nofollow noreferrer"">port listening</a> configuration.</p>
+","1816774",""
+"69275725","69263214","2021-09-21 21:25:21","1","<p>It was difficult to resolve, but you have to specify a <code>port</code> as well as a <code>host</code> in the <code>firebase.json</code> file.</p>
+<pre><code>{
+  &quot;emulators&quot;: {
+    &quot;auth&quot;: {
+      &quot;port&quot;: 9099,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;functions&quot;: {
+      &quot;port&quot;: 5001,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;firestore&quot;: {
+      &quot;port&quot;: 8080,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;database&quot;: {
+      &quot;port&quot;: 9000,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;hosting&quot;: {
+      &quot;port&quot;: 5000,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;pubsub&quot;: {
+      &quot;port&quot;: 8085,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;storage&quot;: {
+      &quot;port&quot;: 9199,
+      &quot;host&quot;: &quot;localhost&quot;
+    },
+    &quot;ui&quot;: {
+      &quot;enabled&quot;: true
+    }
+  }
+}
+</code></pre>
+","7655295",""
+"69320045","69314615","2021-09-24 19:09:41","1","<p>Instead of using sockets, there is also a way to connect to outer docker, from docker in container, over TCP.</p>
+<p>Linux example:</p>
+<p>Run <code>ifconfig</code>, it will print the docker's network interface that is created when you install docker on a host node. Its usually named <code>docker0</code>, note down the IP address of this interface.</p>
+<p>Now, modify the <code>/etc/docker/daemon.json</code> and add this<code>tcp://IP:2375</code> to the <code>hosts</code> section. Restart docker service.</p>
+<p>Run containers with extra option: <code>--add-host=host.docker.internal:host-gateway</code></p>
+<p>Inside any such container, the address <code>tcp://host.docker.internal:2375</code> now points to the outside docker engine.</p>
+","1531054",""
+"69387235","69314615","2021-09-30 06:32:50","0","<p>Try adding your username to the docker group as suggested <a href=""https://stackoverflow.com/questions/48957195/how-to-fix-docker-got-permission-denied-issue"">here</a>.<br />
+Additionally, you should check your kernel <a href=""https://docs.docker.com/engine/install/linux-postinstall/#kernel-compatibility"" rel=""nofollow noreferrer"">compatibility</a>.</p>
+","14663497",""
+"77432466","69314615","2023-11-06 15:56:00","0","<p>just found this issue that I solved recently.
+You need to specify group ID that docker group have on your host, for mounted socket to have permissions.
+Example can be found here
+<a href=""https://github.com/HomeLabHQ/runner"" rel=""nofollow noreferrer"">https://github.com/HomeLabHQ/runner</a></p>
+","9522755",""
+"69369513","69368262","2021-09-28 23:41:49","15","<p>Helm has removed the <code>chart</code> functions, so they are now replaced by <code>push</code> and <code>package</code>.</p>
+<p><a href=""https://i.sstatic.net/FnInV.png"" rel=""noreferrer""><img src=""https://i.sstatic.net/FnInV.png"" alt=""enter image description here"" /></a></p>
+<p>These changes are listed here:
+<a href=""https://github.com/helm/helm/releases/tag/v3.7.0"" rel=""noreferrer"">https://github.com/helm/helm/releases/tag/v3.7.0</a></p>
+<p>So I needed to rename my <code>Chart.yaml</code> to match the AWS registry name, and then my code became:</p>
+<pre><code>echo *****************
+echo SAVING HELM CHART
+echo *****************
+# log in to aws and push the helm chart
+# aws ecr get-login-password --region us-west-2 | helm registry login --username AWS --password-stdin XXXX.amazonaws.com
+# export CHART_FILE=`helm package ./server-helm-chart/ | awk -F'[:]' '{gsub(/ /, &quot;&quot;, $2); print $2}'`
+echo *****************
+echo PUSHING HELM CHART
+echo *****************
+# helm push $CHART_FILE oci://XXXX.dkr.ecr.us-west-2.amazonaws.com/staging/helm:$helmChartVersion
+</code></pre>
+","834393",""
+"78377843","69385940","2024-04-24 10:49:39","0","<p>It fails because there is no postgres instance running on the CI runner. So when your app tries to reach it at <code>postgresql://test:testing@localhost:5432/test</code> it cannot find it. Also, it is bad idea to try to connect the prod (or any environment) db in the outside world to the runner. An alternative is to use <a href=""https://pypi.org/project/testing.postgresql/"" rel=""nofollow noreferrer""><code>testing.postgresql</code></a>. This creates a database in a temp dir. But for this you might need <code>libpq-dev</code> and <code>gcc</code> to be installed in the runner, either via your app's docker image or in the CI yml file.</p>
+","4260095",""
+"69430878","69430109","2021-10-04 04:21:57","3","<p>Turns out I'm an idiot, I had just renamed my project from &quot;Monaco&quot; to &quot;monaco&quot;, but forgot to update the module directory name to lowercase. Fixing that fixed my issue.</p>
+","11584125",""
+"69466751","69465391","2021-10-06 13:32:26","0","<p>Try the following:</p>
+<pre><code>cat ~/.ssh/id_rsa.pub
+</code></pre>
+<p>and copy the public key to</p>
+<pre><code>nano ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/id_rsa
+</code></pre>
+","10868301",""
+"70680812","69520599","2022-01-12 11:31:07","-2","<p>I'm located answer <a href=""https://stackoverflow.com/questions/40274484/fatal-could-not-read-username-for-https-github-com-device-not-configured"">here</a>. Looks like actions cannot handle tty input and throw error</p>
+","12437547",""
+"78884962","69520599","2024-08-18 15:16:19","0","<p>With checkout you already have access to the repo, you do not need to clone.</p>
+<p>For publishing the docs, you have two options:</p>
+<ol>
+<li>Try creating a gh-pages branch directly and push it.</li>
+<li>Use /doc instead of the gh-pages to publish the docs.</li>
+</ol>
+<p>You can also used <a href=""https://github.com/marketplace/actions/sphinx-docs"" rel=""nofollow noreferrer"">sphinx-doc action</a>, which implements what you are trying to do (generating sphinx docs and push them to your repo).</p>
+","2778899",""
+"70333581","70332762","2021-12-13 11:02:09","2","<p>Currently, it seems as though deleting <code>node_modules/</code> <s>as well as <code>package-lock.json</code></s> and regenerating them with <code>npm install</code> remedies this issue.</p>
+<pre><code>&lt;in root&gt;
+rm -rf node_modules/
+npm install
+</code></pre>
+","17439239",""
+"70398791","70386041","2021-12-17 20:52:27","3","<p>You actually need to explicitly give the Repo's Actions permission: <a href=""https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#upgrading-a-workflow-that-accesses-ghcrio"" rel=""nofollow noreferrer"">https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions#upgrading-a-workflow-that-accesses-ghcrio</a></p>
+<p>Necessary steps are:</p>
+<ul>
+<li><p>Navigate to your package landing page.</p>
+</li>
+<li><p>In the left sidebar, click Actions access. &quot;Actions access&quot; option in left menu</p>
+<p>To ensure your container package has access to your workflow, you must add the repository where the workflow is stored to your container. Click Add repository and search for the repository you want to add.</p>
+</li>
+<li><p>&quot;Add repository&quot; button</p>
+<p>Note: Adding a repository to your container through the Actions access menu option is different than connecting your container to a repository. For more information, see &quot;Ensuring workflow access to your package&quot; and &quot;Connecting a repository to a package.&quot;</p>
+</li>
+<li><p>Optionally, using the &quot;role&quot; drop-down menu, select the default access level that you'd like the repository to have to your container image.
+Permission access levels to give to repositories</p>
+</li>
+<li><p>Open your workflow file. On the line where you log in to ghcr.io, ensure to use <code>${{ secrets.GITHUB_TOKEN }}</code> (replace PAT).</p>
+</li>
+</ul>
+<p><strong>Note</strong>: Just linking the Package with the Repo is not enough.</p>
+","725937",""
+"70613414","70610678","2022-01-06 20:43:48","3","<p>You should be able to get URL as output parameter from <code>Azure/static-web-apps-deploy</code>:</p>
+<pre><code>...
+- name: Build And Deploy
+  id: builddeploy
+  uses: Azure/static-web-apps-deploy@v1
+...
+- name: Print Deployment URL
+  run: echo ${{ steps.builddeploy.outputs.static_web_app_url }}
+</code></pre>
+<p>Here's a <a href=""https://github.com/Azure/static-web-apps-deploy/blob/0407e359a606e89151694428fa2457e4ef646693/action.yml#L44"" rel=""nofollow noreferrer"">link</a> to action yml where it's defined.</p>
+","576752",""
+"71759752","70610678","2022-04-06 00:14:15","0","<p>In my case, it was giving an empty string like below.</p>
+<p><code>Environment URL '' is not a valid http(s) URL, so it will not be shown as a link in the workflow graph.</code></p>
+<p>I solved this by restarting my Azure AppService.</p>
+<p>Be sure to check the failed build step, as this error might also be indication of an error.</p>
+","8921643",""
+"70637897","70636392","2022-01-09 01:59:38","3","<p>You actually need to <strong>install python dependencies</strong> (after the setup) before running your python script:</p>
+<p><strong>Something like this (in an intermediary step for example):</strong></p>
+<pre class=""lang-yaml prettyprint-override""><code>      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip pandas
+</code></pre>
+<p><em>Note: You will need to install all necessary dependencies that way, or use a requirements.txt file, or even a virtual environment for example.</em></p>
+<p><strong>If this is the only dependency your python script needs, your workflow could therefore look like this:</strong></p>
+<pre><code>name: run_script
+on: 
+    schedule:
+      - cron: &quot;8 0 * * *&quot; #runs at 08:00 UTC everyday
+jobs:
+  run_review_reports:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo content
+        uses: actions/checkout@v2 # checkout the repository content to github runner.
+      - name: setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.7
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip pandas
+      - name: execute py script
+        run: |
+          python review_reports.py
+</code></pre>
+<ul>
+<li><a href=""https://github.com/GuillaumeFalourd/poc-github-actions/blob/main/.github/workflows/03-python-script-workflow.yml"" rel=""nofollow noreferrer"">Here is a similar workflow executing a python script as reference.</a></li>
+</ul>
+","8496462",""
+"74667171","70734715","2022-12-03 13:25:47","0","<p>Please try it</p>
+<pre><code># Vue 2
+npm install --save-dev @vue/vue2-jest@28 # (use the appropriate version)
+
+yarn add @vue/vue2-jest@28 --dev
+
+
+
+# Vue 3
+npm install --save-dev @vue/vue3-jest@28 # (use the appropriate version)
+
+yarn add @vue/vue3-jest@28 --dev
+</code></pre>
+","9353539",""
+"70775420","70758763","2022-01-19 17:48:32","0","<p>Turns out that in my view class I had something like this:</p>
+<pre><code>public class MyView extends JFrame{
+    private CardLayout layout;
+    private JPanel myPane;
+        
+    public MyView() {
+        setResizable(false);
+        setTitle(&quot;View&quot;);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setBounds(100, 100, 450, 300);
+
+        layout = new CardLayout();
+        getContentPane().setLayout(layout);
+        myPane = new JPanel();
+        getContentPane().add(myPane, &quot;pane&quot;);
+
+        layout.show(getContentPane(), &quot;layout&quot;);
+        pack();
+        setLocationRelativeTo(null);    
+    }
+}
+</code></pre>
+<p>Removing the last three lines fixed it for me. I suppose that they were interfering with <code>xvfb</code>. Also it seems that they add no value to the code itself and it is safe to remove them.</p>
+","14774959",""
+"70766374","70765867","2022-01-19 06:53:12","1","<p>It seems that the AWS CLI is failing to configure the access key id and secret on the pipeline. In order to solve this and make it easier to manage in the long run, I would recommend using the pre-built actions from AWS to ease your pipeline's setup process.</p>
+<p>The most common way of building a Github action pipeline for pushing images to AWS ECR is by using the following actions:</p>
+<ul>
+<li><code>aws-actions/configure-aws-credentials@v1</code></li>
+<li><code>aws-actions/amazon-ecr-login@v1</code></li>
+</ul>
+<p>Using the combination of these actions together enables us to configure the pipeline's shell session to store temporary credentials for the AWS CLI and the ECR credentials for the docker login.</p>
+<pre class=""lang-bash prettyprint-override""><code>    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ap-south-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push the image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.REPO_NAME }}
+        IMAGE_TAG: 1.0
+      run: |
+        # Build a docker container and push it to ECR 
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        echo &quot;Pushing image to ECR...&quot;
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo &quot;::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG&quot;
+</code></pre>
+<p>If the guide above is not sufficient and you need help in configuring the access keys and secrets, I would recommend following the blog written <a href=""https://aws.plainenglish.io/build-a-docker-image-and-publish-it-to-aws-ecr-using-github-actions-f20accd774c3"" rel=""nofollow noreferrer"">here</a></p>
+","983476",""
+"70969786","70765867","2022-02-03 10:38:57","1","<p>Actually, I just had to install AWS CLI on my EC2 instance.</p>
+","17970861",""
+"70966644","70907287","2022-02-03 06:12:18","-1","<p>Based on the above problem statement, we understood that you are looking to clear the web app cache post the deployment.</p>
+<p>In order to achieve this, you can add an app settings <strong>WEBSITE_LOCAL_CACHE_OPTION=Always</strong> which help you in clearing the local cache of the web app.</p>
+<p>for any App Service, its related contents (code files, resources etc.) are being hosted in a Shared Content Folder in order to provision all the features of the App Service like Load Balancing etc. So, if there are 2 VMs configure for Load Balancing then there would just one shared location where all the content of the App Service is hosted.</p>
+<p>When these Web Apps refer to the Content Folder, there might be chances of Latency issues (although, Azure takes care of most of these issues) which might slow down the performance of the websites a bit. In such Performance-critical application, we can leverage the features of “<strong>Azure App Service Local Cache</strong>”.</p>
+<p>For more information, you refer to this Azure documentation on  <a href=""https://learn.microsoft.com/en-us/azure/app-service/overview-local-cache"" rel=""nofollow noreferrer"">Azure App Service Local Cache</a> &amp; <a href=""https://www.c-sharpcorner.com/article/azure-app-service-local-cache/"" rel=""nofollow noreferrer"">this</a> blog post as well .</p>
+","15968720",""
+"71095004","70907287","2022-02-12 19:10:14","0","<p>Right...</p>
+<p>It turns out the way to clear the cache is very simple.  Use the cache clear command as the &quot;startup command&quot;</p>
+<p><a href=""https://i.sstatic.net/ZU4Ay.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/ZU4Ay.png"" alt=""Azure webapp configuration"" /></a></p>
+<p>So I deploy and SSH into the web app and check /home/site/wwwroot/var/cache/staging and voila! all the file are newly created!</p>
+<p>This has occurred to me at the beginning, but it really seemed like a kluge.  I really wanted a cleaner way to do this.  I tried adding the startup command to the deployment script but got this error...</p>
+<p><a href=""https://i.sstatic.net/0no1c.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/0no1c.png"" alt=""GitHub actions error"" /></a></p>
+<p>So I cannot add startup command because there is a publish profile.</p>
+<p>So why did such a simple problem take so long to answer on SO? More than one suggested answers that were completely irrelevant.  All these answers had in common with my issue were words like &quot;cache&quot; and &quot;php&quot;.</p>
+","7422838",""
+"70978284","70953788","2022-02-03 21:04:17","9","<p>I realized my own mistake with this.
+In the environment file where i'm supposed to specify the repository-name i had instead specified the full repository ID
+meaning if the repository is named my-ecr-repo, i had instead accidentally written .dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo
+setting the name to just my-ecr-repo solved the problem</p>
+","18098692",""
+"73457921","70953788","2022-08-23 11:30:19","1","<p>I had this problem when my IAM user did not have sufficient permissions to write to the repository. My updated permissions were as follows, which worked.</p>
+<pre><code>{
+    &quot;Version&quot;: &quot;2012-10-17&quot;,
+    &quot;Statement&quot;: [
+        {
+            &quot;Sid&quot;: &quot;VisualEditor0&quot;,
+            &quot;Effect&quot;: &quot;Allow&quot;,
+            &quot;Action&quot;: [
+                &quot;ecr:CompleteLayerUpload&quot;,
+                &quot;ecr:GetAuthorizationToken&quot;,
+                &quot;ecr:UploadLayerPart&quot;,
+                &quot;ecr:InitiateLayerUpload&quot;,
+                &quot;ecr:BatchCheckLayerAvailability&quot;,
+                &quot;ecr:PutImage&quot;
+            ],
+            &quot;Resource&quot;: &quot;*&quot;
+        }
+    ]
+}
+</code></pre>
+","19828343",""
+"73712150","70953788","2022-09-14 05:59:25","8","<p>While logging into AWS account using the aws-actions/configure-aws-credentials@v1, I was specifying wrong aws-region.</p>
+<p>AWS region should be same as the ecr repo region. Else, even if login is successful, push will fail.</p>
+","9549230",""
+"74464587","70953788","2022-11-16 17:14:48","4","<p>Had the same issue. Saw <a href=""https://stackoverflow.com/questions/70452836/docker-push-to-aws-ecr-hangs-immediately-and-times-out"">here</a> that you can lookup the logs for this issue in Cloudtrail. After doing so I saw that my user was missing the <code>ecr:InitiateLayerUpload</code> action. After updating my user I was able to push to ECR</p>
+","7704150",""
+"76014473","70953788","2023-04-14 11:07:12","0","<p>I also faced the same problem, but what I found that, the ECR repo where I was trying to push doesn't exist. I deleted the repo for some testing purpose and forgot to re-create and trying docker push and it was failing like below :</p>
+<p>f9cb3f1f1d3d: Retrying in 1 second</p>
+<p><strong>EOF</strong></p>
+<p><strong>Error: Process completed with exit code 1.</strong></p>
+<p>I re-created the ECR repo and able to do docker push successfully.</p>
+","21518204",""
+"71885439","71885354","2022-04-15 14:43:25","0","<p>use an updated version of the <a href=""https://github.com/actions/setup-java"" rel=""nofollow noreferrer"">actions/setup-java</a> step, like:</p>
+<pre><code>    steps:
+    - name: checkout
+      uses: actions/checkout@v3.0.1
+    - name: set up JDK 1.8
+      uses: actions/setup-java@
+      with:
+        distribution: 'zulu' # See 'Supported distributions' for available options
+        java-version: '8'
+
+</code></pre>
+","2270041",""
+"72057177","72038527","2022-04-29 11:22:49","1","<p>The deploy action needs write access to your repository.</p>
+<p>Or upgrade to a newer version of the action, i.e. 4.3.3</p>
+","2137416",""
+"72278912","72278554","2022-05-17 18:18:56","0","<p>The best practice is to run your commands with <code>working-directory: </code> for those steps to make them execute in a certain directory - relative to your root folder.</p>
+","2067877",""
+"72280530","72278554","2022-05-17 20:49:45","5","<p>The issue was directory structure. Once i listed the files in the directory and found the path to the files, the action ran successfully. Here is the final yml script.</p>
+<pre><code>on:
+  push:
+     branches:
+       - master
+
+jobs:
+  generate-build-number-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      # required for accessing files in repository.
+
+      # https://github.com/marketplace/actions/build-number-generator
+      - name: Generate build number
+        uses: einaregilsson/build-number@v3
+        with:
+          token: ${{secrets.github_token}}
+
+      - name: Print new build number
+        run: echo &quot;Build number is $BUILD_NUMBER&quot;
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Build Docker
+        run: ${PWD}/docker/build-docker
+      - name: Push Docker
+        run: ${PWD}/docker/push-docker
+</code></pre>
+","11821400",""
+"72309782","72295509","2022-05-19 18:56:43","1","<p>The answer ended up being that my secrets were not properly being fed into my GitHub Actions by the Buildbot I have set up.  Now that the secrets are properly configured, the same code does deploy to Vercel.</p>
+<p><em>face palm</em></p>
+","15478635",""
+"75446337","72295509","2023-02-14 10:13:38","0","<p>LOL I had the same problem, here is fix inside workflow file (workflow.yml):</p>
+<pre><code>      - name: Run worklow
+    env:
+      SOME_TOKEN: ${{ secrets.SOME_TOKEN }}
+    working-directory: ./directory
+    run: run command
+</code></pre>
+","21210407",""
+"72394059","72367855","2022-05-26 15:12:40","2","<p>In the traceback you have <code>getenv('IMAP')</code> but the environment variable is not defined in your workflow.</p>
+<p>Hope that helps.</p>
+","7087644",""
+"72506647","72493761","2022-06-05 10:40:34","0","<p>Can you please run this command on your local machine to see the build failure:</p>
+<pre class=""lang-bash prettyprint-override""><code>npm build
+</code></pre>
+<p>Your application build is failing and you might not be able to get the error because you are running the app in development mode, not the production mode.</p>
+<p>Coming to your React error, it is because you need to wrap <code>routes</code> (<code>Routes</code> / <code>useRoutes</code>) inside a <code>Router</code> element.</p>
+<p>This is what you can put for your entry-point:</p>
+<pre><code>import ReactDOM from 'react-dom';
+import { BrowserRouter } from 'react-router-dom';
+
+
+ReactDOM.render(
+  &lt;BrowserRouter&gt;
+    &lt;App /&gt;
+  &lt;/BrowserRouter&gt;,
+  document.getElementById('root'),
+);
+</code></pre>
+","10527823",""
+"72576048","72570201","2022-06-10 14:37:45","1","<p>your code seems to be correct, you have space issue's with &quot;jobs&quot;,</p>
+<p>shift-tab it and it should work:</p>
+<pre><code>name: Echo message
+on:
+  workflow_dispatch:
+    inputs:
+      hubAddressGroupObject:
+        type: choice
+        description: 'Enter the name of the hub where the entry is added'
+        required: true
+        default: 'AZURE-EUW-XXXXX'
+        options:
+          - 'AZURE-EUW-XXXXX'
+          - 'AZURE-FRC-XXXXX'
+          - 'AZURE-USE-XXXXX'
+          - 'AZURE-FRC-XXXXX'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: WriteMessage
+        run: |
+          echo &quot;${{ github.event.inputs.hubAddressGroupObject }}&quot;
+</code></pre>
+<p><a href=""https://i.sstatic.net/o3IFo.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/o3IFo.png"" alt=""enter image description here"" /></a>
+<a href=""https://i.sstatic.net/fWwfH.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/fWwfH.png"" alt=""enter image description here"" /></a></p>
+","8162407",""
+"75561349","72819996","2023-02-24 21:02:33","0","<p>I would try and add it to your <code>dependencies</code> instead of <code>devDependencies.</code> I have found that doing that will sometimes solve the issue of missing packages during ci/cd builds.</p>
+","12658653",""
+"72994654","72994320","2022-07-15 13:19:31","0","<p>Not an answer but a fragment to try. My <code>Github</code> action runner for <code>ubuntu-latest</code> looks as follows (you probably want to replace the <code>install</code> target in <code>CMake</code> build command with <code>all</code>.</p>
+<pre><code>jobs:
+  ubuntu-build:
+    name: Ubuntu Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+      - name: Create build directory and run CMake
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install libboost-dev
+          cmake -S . -B cmake_build_dir -G &quot;Unix Makefiles&quot; -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=cmake_install_dir
+      - name: Build project
+        run: cmake --build cmake_build_dir --target install --config Release -- -j4
+      - name: Run tests
+        run:  ctest -C Release -VV
+        working-directory: cmake_build_dir
+      - name: Create Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: Ubuntu-Artifacts
+          path: cmake_install_dir/
+        if: always()
+</code></pre>
+","5251059",""
+"72994790","72994320","2022-07-15 13:29:29","2","<p>github.com will give you a fresh runner for every job.</p>
+<p>See here <a href=""https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#using-a-github-hosted-runner"" rel=""nofollow noreferrer"">https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#using-a-github-hosted-runner</a> for details.</p>
+<p>Thus it is not possible to prepare the machine in one job and use it in a later job.</p>
+<p>You should move the installation of the needed packages inside your build job.</p>
+<p>In case you need to exchange artifacts, like binaries from one job to a later job, you should take a look at the github actions <a href=""https://github.com/actions/upload-artifact"" rel=""nofollow noreferrer"">upload-artifact</a> and <a href=""https://github.com/actions/download-artifact"" rel=""nofollow noreferrer"">download-artifact</a>.</p>
+","8281848",""
+"73941762","73018888","2022-10-03 23:31:28","2","<p>As <a href=""https://docs.github.com/en/actions/using-jobs/using-concurrency"" rel=""nofollow noreferrer"">documented</a> &quot;Any previously pending in the concurrency group will be canceled&quot;. In others words, the queue is limited in one. Somewhat useless. To permit parallel execution just not use 'concurrency' term on action.</p>
+","1056652",""
+"73080089","73080088","2022-07-22 12:06:08","7","<p>After a few researches, I found <a href=""https://github.com/python-poetry/poetry/issues/4210"" rel=""noreferrer"">this thread</a> on the poetry GitHub repository from november 2021.</p>
+<p>There is this workaround from <a href=""https://github.com/hoefling"" rel=""noreferrer"">hoefling GitHub user</a>:</p>
+<blockquote>
+<p><strong>Disabling poetry's experimental new installer may be a workaround for
+now:</strong></p>
+</blockquote>
+<h3>Solution</h3>
+<pre class=""lang-bash prettyprint-override""><code>poetry config experimental.new-installer false
+</code></pre>
+<p><strong>Adding this line in the shell before running the <code>poetry install</code> command resolved my problem!</strong></p>
+<hr />
+<hr />
+<p>Note that in the same thread, another comment from <a href=""https://github.com/ddc67cd"" rel=""noreferrer"">ddc67cd</a> stated that:</p>
+<blockquote>
+<p>the issue is resolved with the new version of <strong>cachecontrol==0.12.9</strong> (it should be installed automatically).</p>
+</blockquote>
+<p>But running <code>pip install -U cachecontrol</code> didn't resolve the issue in my specific case (might be worth testing otherwise?).</p>
+<hr />
+<hr />
+<p><em>It also seems the problem came back recently (July 2022) and <a href=""https://github.com/python-poetry/poetry/issues/4210#issuecomment-1178776203"" rel=""noreferrer"">this comment</a> suggested a possible root cause to the issue related to the setuptools library.</em></p>
+<p>Anyway, disabling poetry's experimental new installer should resolve the problem for now, until a permanent solution is found.</p>
+","8496462",""
+"73180332","73178417","2022-07-31 02:40:22","1","<p>Try:</p>
+<pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  ...
+  labels:
+    type: nginx  # &lt;-- correct
+spec:
+  ...
+  selector:
+    matchLabels:
+      type: nginx  # incorrect, remove the '-'
+  template:
+    metadata:
+      labels:
+        type: nginx  # incorrect, remove the '-' 
+    spec:
+      ...
+---
+apiVersion: v1
+kind: Service
+...
+spec:
+  ...
+  ports:
+  - port: 80  # &lt;-- add '-'
+    protocol: TCP
+    targetPort: 80
+</code></pre>
+","14704799",""
+"73261753","73255602","2022-08-06 17:02:36","1","<p>I just had to add the argument <code>--exit-code-from</code> while running the Docker container and that helped GitHub actions to identify the exit code properly.</p>
+","9801092",""
+"73723615","73319566","2022-09-14 22:00:16","0","<p>docker-compose has an option <code>--exit-code-from</code> to wrap it up when one container finishes.</p>
+<p><code>docker-compose up --exit-code-from api</code></p>
+<p>Also I think you will need to remove <code>restart: always</code>. Maybe creating a separate <code>docker-compose</code> yaml file for this testing purposes is a good idea too.</p>
+","324506",""
+"74231975","73394214","2022-10-28 07:31:58","1","<p>You should only need to apt-get the package to install the driver:</p>
+<pre><code>    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Microsoft ODBC
+        run: sudo ACCEPT_EULA=Y apt-get install msodbcsql18 -y
+</code></pre>
+<p>that successfully installs for me. Worth pointing out though that when you connect you'll need to use the mapped port to the container:</p>
+<pre><code>        env:
+          PORT: ${{ job.services.mssql.ports[1433] }}
+</code></pre>
+<p>this assumes SQL Server was setup like:</p>
+<pre><code>      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports: [1433]
+        env:
+          MSSQL_PID: Developer
+          SA_PASSWORD: iugeshrigsuerbiwer
+          ACCEPT_EULA: Y
+</code></pre>
+","912408",""
+"75276882","73394214","2023-01-29 17:25:24","0","<p>You need to run the commands with elevated privileges.
+Simply, add <code>shell</code> with <code>sudo</code> like so:</p>
+<pre><code>- name: Install dependencies
+  run: |
+    python -m pip install --upgrade pip
+    ...
+    sudo apt-get install -y unixodbc-dev
+  shell: sudo bash {0}
+</code></pre>
+","151641",""
+"76351980","73394214","2023-05-28 14:28:23","1","<p>Because all of the above worked for me only sometimes for some reason. I wrote an action that follows the exact instructions from microsoft to install mssql odbc drivers for any distro. Here <a href=""https://github.com/Yarden-zamir/install-mssql-odbc"" rel=""nofollow noreferrer"">https://github.com/Yarden-zamir/install-mssql-odbc</a>. If anyone stumbling onto here like me in the future and finds this useful that would be awesome.</p>
+<p>You can use it like</p>
+<pre><code>      - uses: Yarden-zamir/install-mssql-odbc@main
+</code></pre>
+<p>or</p>
+<pre><code># all inputs
+      - uses: Yarden-zamir/install-mssql-odbc@main
+        with:
+          ODBC_VERSION: 17
+          DISTRO: Alpine
+          DOCS_URL: https://yarden-zamir.com/alternate-docs-path.md
+          REMOVE_EXITS: true
+</code></pre>
+","19101016",""
+"73667912","73626276","2022-09-09 22:10:35","1","<p>As explained by @ianyoung, the problem was with the pip file.  The <a href=""https://realpython.com/lessons/using-requirement-files/#:%7E:text=A%20Beginner%27s%20Guide%20to%20Pip&amp;text=A%20requirements%20file%20is%20a,current%20projects%20dependencies%20to%20stdout%20."" rel=""nofollow noreferrer"">requirements.txt</a> was empty, the requirements file is a list of all of a project’s dependencies. This includes the dependencies needed by the dependencies. It also contains the specific version of each dependency, specified with a double equals sign (==).</p>
+","17544312",""
+"73748536","73717018","2022-09-16 17:42:04","1","<p>Have you also unzipped the src.zip from s3?
+In the makefile you change into the src directory and zip everything underneath, while in the ci yml, you change into data_compaction and zip the src directory recursively, which includes the src directory. It should work again, when you change the CI command to:</p>
+<pre><code>  - name: Create Zip File
+    uses: montudor/action-zip@v0.1.0
+    with:
+      args: sh -c &quot;cd data_compaction/src &amp;&amp; zip -r ../src.zip .&quot;
+</code></pre>
+","8384047",""
+"73822678","73822327","2022-09-23 03:25:37","0","<p>Fixed by using yandex/clickhouse instead of clickhouse/clickhouse</p>
+","7628816",""
+"74244302","74111130","2022-10-29 09:50:24","2","<p>Based on discussions in <a href=""https://github.com/MiKTeX/miktex/discussions/1204"" rel=""nofollow noreferrer"">https://github.com/MiKTeX/miktex/discussions/1204</a> and <a href=""https://github.com/MiKTeX/miktex/issues/1213"" rel=""nofollow noreferrer"">https://github.com/MiKTeX/miktex/issues/1213</a> the solution is to replace the MiKTeX version's zip file</p>
+<p><strong>from</strong>:
+miktexsetup-5.1-x64.zip</p>
+<p><strong>to</strong>:
+miktexsetup-5.2.0+b8f430f-x64.zip</p>
+","1657886",""
+"76953318","74111130","2023-08-22 12:27:19","0","<p>Following GitHub workflow works for me:</p>
+<pre class=""lang-yaml prettyprint-override""><code>name: MiKTeX (Windows)
+on:
+  push:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  miktex:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install MiKTeX
+        run: |
+          choco install miktex --no-progress
+          echo &quot;C:\Program Files\MiKTeX\miktex\bin\x64&quot; | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+      - run: initexmf --admin --verbose --set-config-value=[MPM]AutoInstall=1
+      - run: miktex --admin --verbose packages update-package-database
+      - run: miktex --admin --verbose packages update
+      - run: miktex --verbose packages update
+      - run: miktex --admin --verbose packages install cm-super
+      - run: miktex --admin --verbose fndb refresh
+      - run: initexmf --admin --verbose --update-fndb
+      - run: initexmf --admin --verbose --mklinks --force
+      - run: updmap --admin
+      - run: pdflatex example.tex
+</code></pre>
+<p>See it live at <a href=""https://github.com/koppor/mwe-miktex/blob/main/.github/workflows/miktex-windows.yml"" rel=""nofollow noreferrer"">https://github.com/koppor/mwe-miktex/blob/main/.github/workflows/miktex-windows.yml</a>.</p>
+","873282",""
+"74113575","74112918","2022-10-18 15:26:03","5","<p>The way I've addressed a similar need is to use <code>tee</code>:</p>
+<pre class=""lang-yaml prettyprint-override""><code>    steps:
+      - name: Run Tool
+        run: |
+          some_tool | tee output.log
+        shell: bash
+</code></pre>
+<p>That results in you getting the same logs you'd always see in the GitHub Actions console, while also persisting them to disk. If you want stderr too, do</p>
+<pre class=""lang-bash prettyprint-override""><code>some_tool 2&gt;&amp;1 | tee output.log
+</code></pre>
+<p>Then, in a later step in the same job, you can do whatever you like with those logs, using the <a href=""https://docs.github.com/en/actions/learn-github-actions/expressions#failure"" rel=""noreferrer""><code>if: ${{ failure() }}</code> syntax</a>:</p>
+<pre class=""lang-yaml prettyprint-override""><code>    steps:
+      - name: Persist logs
+        if: ${{ failure() }}
+        run: |
+          cat output.log | do_something_with_logs
+        shell: bash
+</code></pre>
+<p>If you need to persist the logs across a job boundary, you could use <a href=""https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts"" rel=""noreferrer"">artifacts</a>.</p>
+","1159783",""
+"74349256","74305339","2022-11-07 15:47:09","7","<p>I am not sure what is the cause of this error, however I managed to get it fixed by dropping <a href=""https://github.com/Borales/actions-yarn"" rel=""noreferrer"">borales/actions-yarn</a> and using <a href=""https://github.com/actions/setup-node"" rel=""noreferrer"">actions/setup-node</a> instead. It is suggested in the actions-yarn documentation itself, it now only exists to support existing flows. Therefore this might work for you:</p>
+<pre><code>on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install NodeJS
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16.16.0'
+        cache: 'yarn'
+    
+
+    - name: Install dependencies
+      run: yarn install
+
+    - name: lint React App
+      run: yarn lint
+
+    - name Build React App
+      run:yarn build 
+</code></pre>
+","10417510",""
+"74537554","74478449","2022-11-22 18:37:00","0","<p>We had the same issue recently with our aws stack deployed with AWS CDK and GitHub Actions. In our case updating the CDK version and redeploying solved the problem.</p>
+","11664046",""
+"74602497","74601050","2022-11-28 14:58:39","1","<p>I was able to fix it by adding the following in my publish.yml:</p>
+<pre><code>jobs:
+  tests:
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [tests] # See build.yml file where the test job is defined
+</code></pre>
+<p>In my build.yml, I had to add the following:</p>
+<pre><code>on:
+  push:
+    paths-ignore:
+      - 'images/**'
+      - README.md
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  release:
+    types: [ created ]
+  workflow_call:
+</code></pre>
+<p>Notice that workflow_call: entry that needs to be added explicitly.</p>
+","3102968",""
+"74602547","74601050","2022-11-28 15:03:07","1","<blockquote>
+<p>So basically what I want is, when I push an annotated tag, I want to first run the test job from build.yml and then once that succeeds, I would like to run the publish job. Any suggestions on how to get this straight?</p>
+</blockquote>
+<p>You almost got it right with your implementation. You just need a few modifications:</p>
+<ul>
+<li>The <code>build</code> job needs to depends on the <code>publish</code> job:</li>
+</ul>
+<pre class=""lang-yaml prettyprint-override""><code>name: release my-project
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+-[a-zA-Z]*'
+
+jobs:
+  publish:
+     [ ... ]
+
+  build:
+    needs:
+      - publish
+    uses: ./.github/workflows/build.yml
+</code></pre>
+<ul>
+<li>The <code>build</code> needs the <code>workflow_call</code> trigger (as stated by the error message - <a href=""https://docs.github.com/en/actions/using-workflows/reusing-workflows#creating-a-reusable-workflow"" rel=""nofollow noreferrer"">Reference</a>):</li>
+</ul>
+<pre class=""lang-yaml prettyprint-override""><code>on:
+  workflow_call:
+  push:
+    [ ... ]
+</code></pre>
+<hr />
+<p>Note: You could even share the <code>tag</code> value from the previous workflow, sending it as input to the second one by using:</p>
+<pre class=""lang-yaml prettyprint-override""><code>on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+</code></pre>
+<p>Calling the reusable workflow that way from the main workflow:</p>
+<pre><code>  build:
+    needs:
+      - publish
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: 'MY TAG'
+</code></pre>
+","8496462",""
+"74788493","74775432","2022-12-13 17:08:51","0","<p>You're sending a <code>dispatch</code> event to the second workflow with 3 inputs (repository, commit and env), but the second workflow <code>workflow_dispatch</code> event isn't configured to receive those 3 inputs.</p>
+<p>You should have a similar configuration to the one in the first workflow to be able to receive the inputs.</p>
+<p>Like this:</p>
+<pre><code>on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Name of triggered repo'
+        required: true
+        default: '123re'
+        type: string
+      commit:
+        description: 'Short commit'
+        required: true
+        type: string
+        default: 'e123'
+      env:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+</code></pre>
+","8496462",""
+"75326472","74869907","2023-02-02 16:54:57","1","<p>You are probably missing parameters in the command line, here I would say <code>provisioningProfiles</code> parameter in particular.</p>
+<p>To make sure you can run the command correctly you can:</p>
+<ol>
+<li>Open Xcode on your development machine and disable automatic signing if not already unchecked</li>
+<li>Still in Xcode, select your scheme and then run <code>Product</code> &gt; <code>Archive</code> from the menu. Click on <code>Distribute app</code> in the new window and go through the steps. Make sure you select a valid provisioning profile and certificate at this step. Go to the end and just export (don't go to the AppStore), Xcode will generate you an export folder. You should see a file named <code>ExportOptions.plist</code> in this folder, similar to the following:
+<pre class=""lang-xml prettyprint-override""><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;
+&lt;plist version=&quot;1.0&quot;&gt;
+    &lt;dict&gt;
+        &lt;key&gt;destination&lt;/key&gt;
+        &lt;string&gt;export&lt;/string&gt;
+        &lt;key&gt;method&lt;/key&gt;
+        &lt;string&gt;app-store&lt;/string&gt;
+        &lt;key&gt;provisioningProfiles&lt;/key&gt;
+        &lt;dict&gt;
+            &lt;key&gt;your.bundle.id&lt;/key&gt;
+            &lt;string&gt;Provisioning Profile name&lt;/string&gt;
+        &lt;/dict&gt;
+        &lt;key&gt;signingCertificate&lt;/key&gt;
+        &lt;string&gt;Apple Distribution&lt;/string&gt;
+        &lt;key&gt;signingStyle&lt;/key&gt;
+        &lt;string&gt;manual&lt;/string&gt;
+        &lt;key&gt;teamID&lt;/key&gt;
+        &lt;string&gt;123ABC12&lt;/string&gt;
+    &lt;/dict&gt;
+&lt;/plist&gt;
+</code></pre>
+</li>
+<li>Open the exported folder and look for a file named <code>ExportOptions.plist</code>. This file basically contain the arguments that you should pass to your CI command line to mimic what Xcode does locally</li>
+<li>Encode this file as base64 and store it as a Github Actions secret, e.g. <code>IOS_EXPORT_OPTIONS_PLIST</code></li>
+<li>Resolve the file in your Github Action step and decode it from base64, store it somewhere, say $EXPORT_OPTIONS_PATH</li>
+<li>Run your command line with with this added option: <code>xcodebuild archive -yourparams -exportOptionsPlist $EXPORT_OPTIONS_PATH</code></li>
+</ol>
+<p>Note: You can run <code>xcodebuild -h</code> to see all the available options that you can add to the ExportOptions.plist file.</p>
+","702954",""
+"74888244","74887938","2022-12-22 12:01:57","0","<p>You need to define an identifier for the step in order to be able to refer it as an output for the job. See the relevant part of the <a href=""https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-output-parameter"" rel=""nofollow noreferrer"">doc</a>:</p>
+<blockquote>
+<p>Sets a step's output parameter. Note that the step will need an id to be defined to later retrieve the output value.</p>
+</blockquote>
+<p>So you should change your code like:</p>
+<pre><code>job-a:
+    outputs:
+      comment: ${{ steps.store-comment.outputs.comment }}
+    steps:
+    - name: Check if QR already exists
+      uses: peter-evans/find-comment@v2
+      id: find-comment
+      with:
+        issue-number: ${{ github.event.number }}
+        comment-author: &quot;github-actions[bot]&quot;
+        body-includes: Preview Bundle
+
+    - name: Store find-comment output
+      id: store-comment
+      run: echo &quot;comment=${{ steps.find-comment.outputs.comment-id }}&quot; &gt;&gt; $GITHUB_OUTPUT
+
+
+</code></pre>
+","2270041",""
+"74888612","74887938","2022-12-22 12:35:59","0","<p>The answer was to change the <code>outputs</code> variable to take <code>comment-id</code> instead of just <code>comment</code>. I thought the chained property had to match what you put int eh <code>echo</code> command, but apparently it has to match what is in the outputs of <code>peter-evans/find-comment@v2</code>: <a href=""https://github.com/peter-evans/find-comment#outputs"" rel=""nofollow noreferrer"">https://github.com/peter-evans/find-comment#outputs</a></p>
+<pre class=""lang-yaml prettyprint-override""><code>job-a:
+    outputs:
+      comment: ${{ steps.store-comment.outputs.comment-id }}
+</code></pre>
+","13063136",""
+"75023910","74912797","2023-01-05 20:18:07","3","<p>I'm pretty certain the issue happens on Linux specifically, as on Windows and macOS it's running inside a VM. The reason why it would occur in a &quot;real Linux&quot; machine and not in a VM is because user ids and group ids are shared between the &quot;docker host&quot; and docker containers (see more <a href=""https://medium.com/@mccode/understanding-how-uid-and-gid-work-in-docker-containers-c37a01d01cf"" rel=""nofollow noreferrer"">here</a>)</p>
+<p>The GitHub Actions probably has designated permissions for the uids/gids that are contained in the tar.gz and also of the tar.gz itself, while on your local macOS/Windows the dedicated VM for docker doesn't have any &quot;real&quot; user management using Linux.</p>
+<p>I had a similar issue when I used Bitbucket's CI which has some weird policies arounds <a href=""https://confluence.atlassian.com/bbkb/build-fails-due-to-error-container-id-cannot-be-mapped-to-host-id-error-1189491384.html"" rel=""nofollow noreferrer"">uids/gids.</a> This is probably a similar case.</p>
+","9266051",""
+"76633442","75045263","2023-07-07 01:34:22","1","<p>As you discovered, <code>ng test</code> out-of-box runs, then watches to re-run tests on files you change. Angular has some flags to make testing using <a href=""https://angular.io/guide/testing#testing-in-continuous-integration"" rel=""nofollow noreferrer"">continuous integration</a> easier.</p>
+<p>This worked for me:</p>
+<p><strong>package.json</strong>:</p>
+<p><code>&quot;test-ci&quot;: &quot;ng test --no-watch --no-progress --browsers ChromeHeadless&quot;,</code></p>
+<ul>
+<li>I made a separate command so I could run tests locally <em>and</em> in CI without needing to change each time</li>
+<li>you need ChromeHeadless, or you get failures trying to start the GUI version of Chrome on the runner (and you don't need that, anyways)</li>
+</ul>
+<p><strong>karma.conf.js</strong>:</p>
+<p>don't need this, but if you want other tweaks, keep that in</p>
+<p><strong>test.yml</strong>:</p>
+<pre><code>...
+- name: Test
+  run: |
+    npm install
+    npm run test-ci
+</code></pre>
+<p><a href=""https://github.com/meldaravaniel/mybr/actions/runs/5481705507/jobs/9986300168"" rel=""nofollow noreferrer"">proof of functional test run</a> :)</p>
+","8679470",""
+"75099020","75061237","2023-01-12 15:54:31","0","<p>Turns out it was an issue with Karam Browserstack. Seems like this is also affecting several people using Angular 14. The only workaround in place currently is to run <code>sed -i -z &quot;s/ removeAllListeners()\n/ removeAllListeners();process.nextTick(() =&gt; process.exit(code || 0));\n/g&quot; node_modules/karma/lib/server.js</code> in the workflow before the tests are executed. Link to this solution: <a href=""https://github.com/karma-runner/karma-browserstack-launcher/issues/195"" rel=""nofollow noreferrer"">https://github.com/karma-runner/karma-browserstack-launcher/issues/195</a></p>
+","20374510",""
+"75251766","75061237","2023-01-26 21:21:23","0","<p>I had a similar problem on my local machine (so I'm not sure if it would work in github actions). <code>karma start</code> would run perfectly but <code>npm test</code> would hang. The reason is <code>ng test</code> is doing something that karma is not, I am unsure of what exactly since I don't have a lot of experience with angular, but I am guessing it is packaging the application using one of the <code>development</code> or <code>production</code> configurations from <code>angular.json</code>.</p>
+<p>However what fixed the problem for me was generating the <code>karma.conf.js</code> file with angular's own command. Run in the root folder of your project</p>
+<pre><code>npx ng generate config karma
+</code></pre>
+<p>(or this if you have <code>ng</code> installed globally)</p>
+<pre><code>ng generate config karma
+</code></pre>
+","5621315",""
+"76153354","75061237","2023-05-02 09:08:15","1","<p>What worked in my case (.gitlab-ci.yml) was switching ChromeHeadless to Chrome. I didn't need the hack. Found that idea here <a href=""https://github.com/karma-runner/karma/issues/3803#issuecomment-1204484192"" rel=""nofollow noreferrer"">https://github.com/karma-runner/karma/issues/3803#issuecomment-1204484192</a></p>
+<p>It now works on trion/ng-cli-karma with simple:</p>
+<pre><code>- npm install
+- ng test --no-watch --source-map=false --browsers=Chrome
+- npm run build
+</code></pre>
+","1211333",""
+"75276258","75268325","2023-01-29 15:55:16","1","<p>I found out the Docker in GitHub Actions does not support DNS and behaves fundamentally different than regular Docker on Linux. All network communication must be made over the host network. So I had to specify localhost as the database server.</p>
+<p>This would be the correct workflow file:</p>
+<pre><code>name: .NET Backend Build and run Unit Tests
+
+on:
+  push:
+    branches: [ &quot;main&quot; ]
+  pull_request:
+    branches: [ &quot;main&quot; ]
+  workflow_dispatch:
+
+env:
+  CI: true
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+          - 1433:1433
+        env:
+          ACCEPT_EULA: &quot;Y&quot;
+          MSSQL_SA_PASSWORD: &quot;redacted&quot;
+          MSSQL_PID: &quot;Express&quot;
+          MSSQL_COLLATION: &quot;SQL_Latin1_General_CP1_CI_AS&quot;
+
+    steps:
+    - name: get Container ID
+      run: echo &quot;DATABASE_ID=$(docker ps --all --filter status=running --format &quot;{{.ID}}&quot;)&quot; &gt;&gt; $GITHUB_ENV
+
+    - name: create database
+      run: docker exec $DATABASE_ID /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'redacted' -Q 'CREATE DATABASE dbname'
+
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore
+
+    - name: Test
+      env:
+        DATABASE_SERVER: localhost
+        DATABASE_PORT: 1433
+        DATABASE_NAME: dbname
+        DATABASE_USER: sa
+        DATABASE_PASSWORD: redacted
+      run: dotnet test --no-build --verbosity normal
+</code></pre>
+","11333318",""
+"75377583","75337206","2023-02-07 18:35:36","5","<p>I found documentation that proves this isn't possible. There is no supporting info stating that the <code>uses</code> key has access to any contexts.</p>
+<p>See: <a href=""https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability"" rel=""noreferrer"">https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability</a></p>
+<p>I believe this is an architectural limitation of GitHub Actions, it appears they want to resolve all workflows/actions at the start of all jobs and thus dynamic resolution isn't possible.</p>
+","868321",""
+"75412290","75386396","2023-02-10 14:11:18","0","<p>At the YAML level, single quotes around <code>${{ secrets... }}</code> should fix the syntax error.</p>
+<p>But, according to the <a href=""https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability"" rel=""nofollow noreferrer"">Context availability</a>, the <code>secrets</code> context is not allowed under <code>stratey</code>. The allowed contexts are:</p>
+<pre><code>jobs.&lt;job_id&gt;.strategy      github, needs, vars, inputs
+</code></pre>
+<p>You can make use of the <a href=""https://docs.github.com/en/actions/learn-github-actions/contexts#vars-context"" rel=""nofollow noreferrer""><code>vars</code> context</a> for your use case.</p>
+<p>Apart from that, linting your workflow with <a href=""https://rhysd.github.io/actionlint/"" rel=""nofollow noreferrer"">https://rhysd.github.io/actionlint/</a> would be much faster to identify potential issues.</p>
+<hr />
+<p><strong>UPDATE</strong> (by <a href=""https://stackoverflow.com/users/4473386/dmytro-chasovskyi"">Dmytro Chasovskyi</a>)</p>
+<p>Here is an example with the <code>vars</code> context:</p>
+<p>With a variable <code>DOMAINS</code> having this config:</p>
+<pre class=""lang-json prettyprint-override""><code>{
+   &quot;v1&quot;: {
+     &quot;url&quot;: &quot;http://localhost:80/api/v1&quot;
+   },
+   &quot;v2&quot;: {
+     &quot;url&quot;: &quot;http://localhost:80/api/v2&quot;
+   }
+}
+</code></pre>
+<p>the workflow will be:</p>
+<pre class=""lang-yaml prettyprint-override""><code>jobs:
+  build:
+    strategy:
+      matrix:
+        domain: [['main', 'books-v1', '${{ vars.DOMAINS.v1.url }}'], ['old-main', 'books-v2', '${{ vars.DOMAINS.v2.url }}']]
+</code></pre>
+","7670262",""
+"75463778","75462617","2023-02-15 18:02:18","2","<p>Your pipeline is not failing because of Firebase, it fails because of <code>npm run build</code>, apparently that doesn't work when <code>CI</code> environment variable is set to <code>true</code> as it checks for linter rules</p>
+<blockquote>
+<p>&quot;<em>When creating a build of your application with <code>npm run build</code> linter
+warnings are not checked by default. Like <code>npm test</code>, you can force
+the build to perform a linter warning check by setting the environment
+variable <code>CI</code>. If any warnings are encountered then the build fails.&quot; - source: <a href=""https://create-react-app.dev/docs/running-tests/#continuous-integration"" rel=""nofollow noreferrer"">CRA CI</a></em></p>
+</blockquote>
+<p>You can disable that behavior for now by adding <a href=""https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsenv"" rel=""nofollow noreferrer""><code>env</code></a> with <code>CI=false</code></p>
+<pre><code>on:
+  push:
+    branches:
+      - main
+jobs:
+    build_and_deploy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - run: npm ci
+        - run: npm run build
+          env:
+            CI: false
+        - uses: FirebaseExtended/action-hosting-deploy@v0
+          with:
+            repoToken: &quot;${{ secrets.GITHUB_TOKEN }}&quot;
+            firebaseServiceAccount: &quot;${{ secrets.FIREBASE_SERVICE_ACCOUNT_XX}}&quot;
+            channelId: live
+            projectId: XX
+</code></pre>
+<p>One other option is to add <code>CI=false</code> to your <code>package.json</code>'s <code>build</code> command so it would be:</p>
+<pre><code>&quot;build&quot;: &quot;CI=false react-scripts build&quot;
+</code></pre>
+<p>Or maybe better, consider fixing your linting warnings/errors :)</p>
+","5078746",""
+"75583253","75583227","2023-02-27 16:44:53","1","<p>Hey your context path is incorrect I believe.</p>
+<p>You could try something like this:</p>
+<pre class=""lang-yaml prettyprint-override""><code>with:
+  context: ./encoding
+  file: ./encoding/Dockerfile
+</code></pre>
+<p>Your current working directory should already be <code>/app</code>.</p>
+<p>And the <code>context</code> in your <code>build.yml</code> like for the <code>dockerfile</code> will be resolved using the current working directory.</p>
+","20089500",""
+"77167722","75583227","2023-09-24 15:24:24","1","<p>I did try something new when the error kept on persisting.Which is restart my IDE.
+Sometime the issue is not that complicated as we may think.</p>
+","17899844",""
+"75735736","75733616","2023-03-14 16:13:58","14","<p>According to the <a href=""https://docs.github.com/en/actions/using-workflows/reusing-workflows#calling-a-reusable-workflow"" rel=""noreferrer"">GitHub official documentation</a>:</p>
+<blockquote>
+<p>You call a reusable workflow by using the uses keyword. Unlike when you are using actions within a workflow, you call reusable workflows directly within a job, and not from within job steps.</p>
+</blockquote>
+<p>Therefore, <strong>you can't call a reusable workflow from a job <code>step</code></strong>.</p>
+<hr />
+<p>A workaround in your case could be using a <a href=""https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-a-public-action-in-a-subdirectory"" rel=""noreferrer"">local action</a>, which basically allows you to use an action in the same repository as the workflow.</p>
+<p><strong>Example of a local action call:</strong></p>
+<pre><code>jobs:
+  my_first_job:
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Use local my-action
+        uses: ./.github/actions/my-action
+</code></pre>
+<p><em>Note that you need to inform the path to the directory that contains the action in your workflow's repository. Therefore, to access the action file, you must check out your repository before using the action with the <code>actions/checkout</code>.</em></p>
+<p>This local action could be a <a href=""https://docs.github.com/en/actions/creating-actions/creating-a-composite-action"" rel=""noreferrer"">composite action</a>, similar to what a reusable workflow could achieve using actions, scripts or shell commands. I recommend <a href=""https://dev.to/n3wt0n/composite-actions-vs-reusable-workflows-what-is-the-difference-github-actions-11kd"" rel=""noreferrer"">this article to understand the difference between composite actions and reusable workflows</a>.</p>
+","8496462",""
+"75846432","75839566","2023-03-26 07:30:01","1","<p>To enable access to your MongoDB database via GitHub Actions, you need to add the IP address and select the <strong>Allow Access from Anywhere</strong> option.</p>
+","21485808",""
+"78117472","75839566","2024-03-06 21:09:19","-1","<p>Rather than allowing <em>any</em> IP to access the cluster, you can add the runner's IP for the duration of the job:</p>
+<ul>
+<li><p>As a secret, supply <a href=""https://www.mongodb.com/docs/atlas/configure-api-access/#std-label-create-org-api-key"" rel=""nofollow noreferrer"">API credentials</a> with the Project Owner role. <strong>Note</strong> that you must also permit access to any IP for the Atlas administration API itself (<a href=""https://www.mongodb.com/docs/atlas/configure-api-access/#optional--require-an-ip-access-list-for-the-atlas-administration-api"" rel=""nofollow noreferrer"">docs</a>).</p>
+</li>
+<li><p>Make a request to e.g. <a href=""https://checkip.amazonaws.com"" rel=""nofollow noreferrer"">https://checkip.amazonaws.com</a> to find out what the specific runner's public IP is:</p>
+<pre class=""lang-yaml prettyprint-override""><code>- name: Get the public IP of the runner
+  id: get-ip
+  shell: bash
+  run: |
+    echo &quot;ip-address=$(curl https://checkip.amazonaws.com)&quot; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+</code></pre>
+</li>
+<li><p>Make a request to the MongoDB Atlas API <a href=""https://www.mongodb.com/docs/atlas/reference/api-resources-spec/v2/#tag/Project-IP-Access-List/operation/createProjectIpAccessList"" rel=""nofollow noreferrer""><code>POST /groups/{groupId}/accessList</code></a> to permit access to that IP:</p>
+<pre class=""lang-yaml prettyprint-override""><code>- name: Permit the runner to access MongoDB Atlas
+  id: allow-ip
+  shell: bash
+  run: |
+    curl \
+       --data '[{&quot;ipAddress&quot;: &quot;${{ steps.get-ip.outputs.ip-address }}&quot;, &quot;comment&quot;: &quot;GitHub Actions Runner&quot;}]' \
+       --digest \
+       --header 'Accept: application/vnd.atlas.2023-02-01+json' \
+       --header 'Content-Type: application/json' \
+       --user &quot;$USERNAME:$PASSWORD&quot; \
+       &quot;https://cloud.mongodb.com/api/atlas/v2/groups/$GROUP_ID/accessList&quot;
+  env:
+    GROUP_ID: ${{ secrets.ATLAS_GROUP_ID }}
+    PASSWORD: ${{ secrets.ATLAS_PRIVATE_KEY }}
+    USERNAME: ${{ secrets.ATLAS_PUBLIC_KEY }}
+</code></pre>
+</li>
+<li><p>After the access has happened, on success <em>or</em> failure, make a request to <a href=""https://www.mongodb.com/docs/atlas/reference/api-resources-spec/v2/#tag/Project-IP-Access-List/operation/deleteProjectIpAccessList"" rel=""nofollow noreferrer""><code>DELETE /groups/{groupId}/accessList/{entryValue}</code></a> to revoke access:</p>
+<pre class=""lang-yaml prettyprint-override""><code>- name: Revoke the runner's access to MongoDB Atlas
+  if: always() &amp;&amp; steps.allow-ip.outcome == 'success'
+  shell: bash
+  run: |
+    curl \
+       --digest \
+       --header 'Accept: application/vnd.atlas.2023-02-01+json' \
+       --request 'DELETE' \
+       --user &quot;$USERNAME:$PASSWORD&quot; \
+       &quot;https://cloud.mongodb.com/api/atlas/v2/groups/$GROUP_ID/accessList/${{ steps.get-ip.outputs.ip-address }}&quot;
+  env:
+    GROUP_ID: ${{ secrets.ATLAS_GROUP_ID }}
+    PASSWORD: ${{ secrets.ATLAS_PRIVATE_KEY }}
+    USERNAME: ${{ secrets.ATLAS_PUBLIC_KEY }}
+</code></pre>
+</li>
+</ul>
+<p>Another way to do this, including automatically applying the post-job step, is in a <a href=""https://docs.github.com/en/actions/creating-actions/creating-a-javascript-action"" rel=""nofollow noreferrer"">custom JavaScript action</a> (using <a href=""https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions#runspost"" rel=""nofollow noreferrer""><code>runs.post</code></a> to make the <code>DELETE</code> request). I have <a href=""https://github.com/marketplace/actions/allow-mongodb-atlas-ip"" rel=""nofollow noreferrer"">published</a> such an action to the marketplace.</p>
+","3001761",""
+"78593379","75839566","2024-06-07 17:42:14","0","<p>Just to add to the answer by @jonrsharpe, this approach can be simplified by using the <a href=""https://github.com/mongodb/atlas-github-action"" rel=""nofollow noreferrer"">MongoDB Atlas CLI github action</a>.</p>
+<pre><code>  # Grant temporary MongoDB access to this Github Action runner ip address
+  - name: Get the public IP of this runner
+    id: get_gh_runner_ip
+    shell: bash
+    run: |
+      echo &quot;ip_address=$(curl https://checkip.amazonaws.com)&quot; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+  - name: Setup MongoDB Atlas cli
+    uses: mongodb/atlas-github-action@v0.2.0
+  - name: Add runner IP to MongoDB access list
+    shell: bash
+    run: |
+      atlas accessLists create ${{ steps.get_gh_runner_ip.outputs.ip_address }} --type ipAddress --projectId ${{ env.MONGODB_ATLAS_PROJECT_ID }} --comment  &quot;Temporary access for GH Action&quot;
+</code></pre>
+<p>At the end of your workflow:</p>
+<pre><code>    - name: Remove GH runner IP from MongDB access list
+    shell: bash
+    run: |
+      atlas accessLists delete ${{ steps.get_gh_runner_ip.outputs.ip_address }} --projectId ${{ env.MONGODB_ATLAS_PROJECT_ID }} --force
+</code></pre>
+","9822967",""
+"76809543","75884083","2023-08-01 07:53:36","0","<p>Here is an example from a working GitHub Action</p>
+<pre><code>    - name: Deploy with AWS CloudFormation
+      uses: aws-actions/aws-cloudformation-github-deploy@v1
+      with:
+        name: service-name
+        template: stack.yaml
+        parameter-overrides: &gt;-
+          FirstParameter=stg,            
+          SecondParameter=something
+</code></pre>
+","4061047",""
+"76029814","76029565","2023-04-16 19:01:26","2","<p>I'm not familiar with those two appleboy actions but taking a quick look at the projects, there was a recent release of their base docker image that changes how env vars are getting used:</p>
+<p><a href=""https://github.com/appleboy/drone-ssh/pull/252"" rel=""nofollow noreferrer"">https://github.com/appleboy/drone-ssh/pull/252</a></p>
+<blockquote>
+<p>Modify the EnvVars slice to include INPUT_ prefix when needed</p>
+<p>...</p>
+</blockquote>
+<p>Additionally, you're using a very old / outdated version of the <code>actions/checkout@v1</code></p>
+<p>I'd strongly recommend updating your config to handle the latest versions.</p>
+","4526019",""
+"76030411","76029565","2023-04-16 21:26:00","7","<p>I finally found the solution here: <a href=""https://github.com/appleboy/scp-action/issues/113"" rel=""nofollow noreferrer"">https://github.com/appleboy/scp-action/issues/113</a></p>
+<p>Change</p>
+<pre><code>env:
+  host: ${{ secrets.SSH_HOST }}
+  username: ${{ secrets.SSH_USER }}
+  key: ${{ secrets.SSH_KEY }}
+  port: ${{ secrets.SSH_PORT}}
+with:
+  source: '.'
+  target: ${{ secrets.PATH }}
+</code></pre>
+<p>to</p>
+<pre><code>with:
+  host: ${{ secrets.SSH_HOST }}
+  username: ${{ secrets.SSH_USER }}
+  key: ${{ secrets.SSH_KEY }}
+  port: ${{ secrets.SSH_PORT}}
+  source: '.'
+  target: ${{ secrets.PATH }}
+</code></pre>
+","7277941",""
+"76331050","76324589","2023-05-25 10:00:03","0","<p>Finally figured this out, turns out that if you specify an environment for your jobs, then the subject claim in the jwt/oidc token changes from:</p>
+<blockquote>
+<p>repo:organization-name/repo-name:ref:refs/heads/main</p>
+</blockquote>
+<p>to...</p>
+<blockquote>
+<p>repo:organization-name/repo-name:environment:env_name</p>
+</blockquote>
+<p>So I updated the bound_claims in the github-actions module config in vault to include both the repo and the environment (could also use a wildcard if you wanted) and now the auth works.</p>
+","1904792",""
+"76435762","76424344","2023-06-08 21:21:52","3","<p>Thanks for adding the full details.</p>
+<p>I can't say definitively what it is, but some things to try:</p>
+<ul>
+<li><p>it isn't missing the fixture file, since <code>cy.fixture(&quot;taskList&quot;)</code> would throw a different error.</p>
+</li>
+<li><p>it might be using a different version of the <code>taskList</code>, but can't see how. Add an <code>expect()</code> to see if the fixture file is correct</p>
+<pre class=""lang-js prettyprint-override""><code>cy.fixture(&quot;taskList&quot;).then((taskList) =&gt; {
+  expect(taskList[0].task).to.eq('Do the laundry')
+</code></pre>
+</li>
+<li><p>use <code>cy.get(...).should('contain', taskList[0].task)</code> for a better error message - it should tell you what the task texts actually are.</p>
+</li>
+<li><p>since it's React, try adding a <code>cy.wait(0)</code> after the <code>click()</code>. Sometimes hooks do not complete their event handlers because the Cypress test hogs the Javascript thread, and <code>cy.wait(0)</code> releases the thread so that React hooks can complete the <code>click()</code> action.</p>
+</li>
+<li><p>instead of increasing the timeout to <code>20_000</code> for the Github run, try <em>decreasing</em> it to say 200 - 500 ms for the <em>local</em> run to see if you can reproduce the error locally</p>
+</li>
+</ul>
+","20771654",""
+"76718502","76424344","2023-07-19 06:26:52","0","<p>add
+<em><strong>numTestsKeptInMemory: 0</strong></em>
+in your cypress.config file</p>
+<p>Thanks!</p>
+","14504581",""
+"76450403","76434747","2023-06-11 12:05:33","1","<p>Ok, so the issue was resolved by removing the usage of <code>pyargs</code> from the pytest command..</p>
+","8082027",""
+"76488565","76484161","2023-06-16 08:57:16","0","<p>Turns out I needed to actually establish the VPN connection before attempting SSH not use it as part of the script inside the SSH so I just added this step:</p>
+<pre><code>      - name: Establish VPN connection
+        run: |
+            sudo apt update
+            sudo apt install -y openvpn openvpn-systemd-resolved
+            echo &quot;${{ secrets.VPN_CONFIG }}&quot; &gt; vpn-config.ovpn
+            echo &quot;${{ secrets.VPN_USERNAME }}&quot; &gt; vpn-credentials.txt
+            echo &quot;${{ secrets.VPN_PASSWORD }}&quot; &gt;&gt; vpn-credentials.txt
+            sudo openvpn --config vpn-config.ovpn --auth-user-pass vpn-credentials.txt --daemon
+            sleep 15
+        
+</code></pre>
+","20367074",""
+"76623297","76484161","2023-07-05 18:55:01","1","<p>Here is an example using a separated OpenVPN action:</p>
+<pre><code>name: OpenVPN
+
+on:
+  workflow_dispatch:
+  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install OpenVPN
+        run: |
+          sudo apt update
+          sudo apt install -y openvpn openvpn-systemd-resolved
+          
+      - name: Setup VPN config
+        run: |
+          echo &quot;${{ secrets.OVPN_CA }}&quot; &gt; ca.crt
+          echo &quot;${{ secrets.OVPN_CERT }}&quot; &gt; user.crt
+          
+      - name: Connect to VPN
+        uses: &quot;kota65535/github-openvpn-connect-action@v2&quot;
+        with:
+          config_file: .github/workflows/ovpn/client.ovpn
+          username: ${{ secrets.OVPN_USERNAME }}
+          password: ${{ secrets.OVPN_PASSWORD }}
+          client_key: ${{ secrets.OVPN_USER_KEY }}
+
+      - name: multiple command
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_RELAY }}
+          username: ${{ secrets.SSH_RELAY_USER }}
+          password: ${{ secrets.SSH_RELAY_PWD }}
+          port: ${{ secrets.SSH_RELAY_PORT }}
+          script: |
+            whoami
+            ls -al
+
+      - name: Kill VPN connection
+        if: always()
+        run: |
+          sudo killall openvpn          
+</code></pre>
+","11058128",""
+"76516794","76512235","2023-06-20 16:40:55","0","<p>I could solve it:
+I had to adapt my Dockerfile and write &quot;COPY dbt .&quot;, because this is the subfolder where the actual dbt code is located</p>
+","4904027",""
+"76573716","76570482","2023-06-28 13:35:11","0","<p>The boilerplate code <a href=""https://create.t3.gg"" rel=""nofollow noreferrer"">create-t3-app</a> I used, ignored <code>next-env.d.ts</code> type declaration file from git which included a lot of types including image types.</p>
+<p>This is why <code>tsc --noEmit</code> is working locally but not on GitHub CLI.</p>
+<p>I just added this file to the repo and the build is succeeding ✅</p>
+","9698583",""
+"76685576","76681761","2023-07-14 07:31:10","0","<p>When facing the issue of my React app not running in the original path <em>/home/samuel/actions-runner/client/github-actions-example-client/github-actions-example-client/build</em>, I found a solution within my GitHub Actions workflow file to move the build folder to the desired location (<em>/var/www/</em>) using the sudo command.</p>
+<p>However, it's important to note that providing the user password as plain text within the workflow is not considered the most secure approach. To address this, I utilized <strong>GitHub Secrets</strong> to securely store and access sensitive information like passwords.</p>
+<p>Here's how I modified my workflow file to move the build folder using the sudo command:</p>
+<pre><code>    run: echo &quot;${{ secrets.USER_PASSWORD }}&quot; | sudo -S rm -R /var/www/build
+
+    run: echo &quot;${{ secrets.USER_PASSWORD }}&quot; | sudo -S mv /home/samuel/actions-runner/client/github-actions-example-client/github-actions-example-client/build /var/www
+</code></pre>
+<p>In this example, I stored my user password as a secret named <strong>USER_PASSWORD</strong> in the GitHub repository's Secrets settings.</p>
+","17975403",""
+"77498800","76746551","2023-11-17 00:51:06","2","<p>Using the <code>pull_request_target</code> event instead of <code>pull_request</code> in your GitHub Actions workflow is a suitable approach for this scenario.</p>
+<p>It allows workflows to access repository secrets when triggered by pull requests from forks, addressing the limitation you've encountered. However, it's crucial to handle this feature with care due to its security implications.</p>
+","5127522",""
+"76750640","76749213","2023-07-23 23:08:03","1","<p>The issues with the code example above were:</p>
+<ul>
+<li><a href=""https://docs.github.com/en/actions/using-jobs/defining-outputs-for-jobs"" rel=""nofollow noreferrer"">job-level outputs</a>
+<ul>
+<li>When using outputs across different jobs, the required outputs should be defined on job level and not step level only.</li>
+</ul>
+</li>
+<li><a href=""https://docs.github.com/en/actions/learn-github-actions/expressions#fromjson"" rel=""nofollow noreferrer"">fromJSON</a>
+<ul>
+<li><code>matrix_values</code> output then needs to be used in <a href=""https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstrategymatrix"" rel=""nofollow noreferrer""><code>strategy.matrix</code></a> which requires <code>fromJSON</code> to convert the value to an array.</li>
+</ul>
+</li>
+</ul>
+<p>Detailed discussion and generic example available in this answer: <a href=""https://stackoverflow.com/a/62953566/17490003"">Github Actions: How use strategy/matrix with script</a></p>
+<p>Based on the <a href=""https://github.com/knowyrtech/matrix/actions/runs/5639102625/workflow"" rel=""nofollow noreferrer"">url provided</a> in comments, here is the updated version with correctly setting and exporting the required output for matrix usage:</p>
+<pre><code>jobs:
+  convert-to-matrix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get LS Output
+        id: matrix_step
+        run: |
+          list=$(ls -1 /etc/*.conf);
+          matrix_values=$(echo '[ &quot;'&quot;$(echo &quot;$list&quot; | sed ':a;N;$!ba;s/\n/&quot;, &quot;/g')&quot;'&quot; ]')
+          echo &quot;Matrix values: $matrix_values&quot;
+          echo &quot;matrix_values=$matrix_values&quot; &gt;&gt; $GITHUB_OUTPUT
+    outputs:
+      matrix-combination: ${{ steps.matrix_step.output.matrix_values }}   
+  build:
+    runs-on: ubuntu-latest
+    needs: convert-to-matrix
+    
+    strategy:
+      matrix: 
+        filename: ${{ fromJSON(needs.setup-matrix.outputs.matrix-combinations) }}
+</code></pre>
+<hr />
+","17490003",""
+"77854067","76756736","2024-01-21 08:22:48","1","<p>Run this command locally and commit &amp; push</p>
+<pre><code>bundle lock --add-platform x86_64-linux
+</code></pre>
+<p>Your CI environment is Ubuntu.</p>
+<pre><code>runs-on: ubuntu-latest
+</code></pre>
+","14832618",""
+"76797940","76797766","2023-07-30 13:20:20","1","<p>Giving GitHub Actions permission to create and/or approve pull requests can introduce a number of security issues, so there is a seperate policy in your actions setting that restricts Actions from Creating and Approving pull requests that must be enabled seperately.</p>
+<p>See:</p>
+<ul>
+<li><a href=""https://docs.github.com/en/enterprise-cloud@latest/admin/policies/enforcing-policies-for-your-enterprise/enforcing-policies-for-github-actions-in-your-enterprise#preventing-github-actions-from-creating-or-approving-pull-requests"" rel=""nofollow noreferrer"">https://docs.github.com/en/enterprise-cloud@latest/admin/policies/enforcing-policies-for-your-enterprise/enforcing-policies-for-github-actions-in-your-enterprise#preventing-github-actions-from-creating-or-approving-pull-requests</a></li>
+</ul>
+<blockquote>
+<p>You can choose to allow or prevent GitHub Actions workflows from creating or approving pull requests.</p>
+<p>By default, when you create a new enterprise, workflows are not allowed to create or approve pull requests.</p>
+<ol>
+<li><p>In the top-right corner of GitHub.com, click your profile photo, then click Your enterprises.</p>
+</li>
+<li><p>In the list of enterprises, click the enterprise you want to view.</p>
+</li>
+<li><p>In the enterprise account sidebar, click Policies. Under &quot;Policies&quot;, click Actions.</p>
+</li>
+<li><p>Under &quot;Workflow permissions&quot;, use the Allow GitHub Actions to create and approve pull requests setting to configure whether GITHUB_TOKEN can create and approve pull requests.</p>
+</li>
+<li><p>Click <kbd>Save</kbd> to apply the settings.</p>
+</li>
+</ol>
+</blockquote>
+<p>The same setting can be found in the organization settings and the repository settings:</p>
+<p><a href=""https://i.sstatic.net/inmZy.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/inmZy.png"" alt=""Go to Settings, Actions"" /></a></p>
+<p><a href=""https://i.sstatic.net/9JiDi.png"" rel=""nofollow noreferrer""><img src=""https://i.sstatic.net/9JiDi.png"" alt=""Scroll down to set the permissions for the token"" /></a></p>
+<p>And when doing a pull request across branches, you may have to provide your own PAT token or Oauth App Token because the token created for Actions is only authorized in the repo hosting the workflow.</p>
+","736079",""
+"76863172","76861533","2023-08-08 21:03:07","0","<p>turns out the issue was caused by 'flutter_localizations'<br />
+that lacked a <code>l10n.yaml</code> file.</p>
+<p>I'll open an issue on flutter repo since the error message is unclear</p>
+<p>Thank you @venir for pointing me in the right direction!</p>
+","9836706",""
+"76927879","76924487","2023-08-18 09:01:40","0","<p><em><strong>I created one sample Azure Storage queue trigger with Python v2 Programming model and deployed it via Github actions like below:-</strong></em></p>
+<p><strong>My function_app.py code:-</strong></p>
+<pre class=""lang-py prettyprint-override""><code>import azure.functions as func
+import logging
+
+app = func.FunctionApp()
+
+@app.queue_trigger(arg_name=&quot;azqueue&quot;, queue_name=&quot;myqueue&quot;,
+                               connection=&quot;valleystrg129_STORAGE&quot;) 
+def queue_trigger(azqueue: func.QueueMessage):
+    logging.info('Python Queue trigger processed a message: %s',
+                azqueue.get_body().decode('utf-8'))
+</code></pre>
+<p><strong>host.json:-</strong></p>
+<pre class=""lang-json prettyprint-override""><code>{
+  &quot;version&quot;: &quot;2.0&quot;,
+  &quot;logging&quot;: {
+    &quot;applicationInsights&quot;: {
+      &quot;samplingSettings&quot;: {
+        &quot;isEnabled&quot;: true,
+        &quot;excludedTypes&quot;: &quot;Request&quot;
+      }
+    }
+  },
+  &quot;extensionBundle&quot;: {
+    &quot;id&quot;: &quot;Microsoft.Azure.Functions.ExtensionBundle&quot;,
+    &quot;version&quot;: &quot;[4.*, 5.0.0)&quot;
+  },
+  &quot;concurrency&quot;: {
+    &quot;dynamicConcurrencyEnabled&quot;: true,
+    &quot;snapshotPersistenceEnabled&quot;: true
+  }
+}
+</code></pre>
+<p><strong>local.settings.json:-</strong></p>
+<pre class=""lang-json prettyprint-override""><code>{
+  &quot;IsEncrypted&quot;: false,
+  &quot;Values&quot;: {
+    &quot;FUNCTIONS_WORKER_RUNTIME&quot;: &quot;python&quot;,
+    &quot;AzureWebJobsStorage&quot;: &quot;DefaultEndpointsProtocol=https;AccountName=valleystrg129;AccountKey=xxxxxyVIUxxxd0ZrE7BVInRkzDF+AStPI60+Q==;EndpointSuffix=core.windows.net&quot;,
+    &quot;AzureWebJobsFeatureFlags&quot;: &quot;EnableWorkerIndexing&quot;,
+    &quot;valleystrg129_STORAGE&quot;: &quot;DefaultEndpointsProtocol=https;AccountName=valleystrg129;AccountKey=xxxxyVIUtd15vOnm8wt4xxxxkzDF+AStPI60+Q==;EndpointSuffix=core.windows.net&quot;
+  }
+}
+</code></pre>
+<p><img src=""https://i.imgur.com/YxSnKfS.png"" alt=""enter image description here"" /></p>
+<p>My Function queue trigger got deployed to Function app successfully like below:-</p>
+<p><strong>My github action workflow:-</strong></p>
+<pre class=""lang-yaml prettyprint-override""><code>name: Build and deploy Python project to Azure Function App - valleyfunc496
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' 
+  PYTHON_VERSION: '3.10' 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Python version
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v2
+        with:
+          name: python-app
+          path: |
+            . 
+            !venv/
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-function.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v2
+        with:
+          name: python-app
+          path: .
+
+      - name: 'Deploy to Azure Functions'
+        uses: Azure/functions-action@v1
+        id: deploy-to-function
+        with:
+          app-name: 'valleyfunc496'
+          slot-name: 'Production'
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_4F433CE262C6430E9690DCA16871A27B }}
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true
+</code></pre>
+<p><strong>Output:-</strong></p>
+<p><img src=""https://i.imgur.com/143EDUj.png"" alt=""enter image description here"" /></p>
+","20849135",""
+"77007901","76952023","2023-08-30 12:09:40","1","<p>Unlike <code>pull_request</code>, <code>pull_request_target</code> run the workflow in the context of the target repository, so you have access to the secrets. You can reduce this vulnerability by adding <code>labeled</code> type, however it doesn't really make this a safe approach</p>
+<p>From <a href=""https://securitylab.github.com/research/github-actions-preventing-pwn-requests/"" rel=""nofollow noreferrer"">Keeping your GitHub Actions and workflows secure</a></p>
+<blockquote>
+<p>As such this approach should only be used as a temporary solution,
+until a proper fix from the options above is applied. Since external
+users do not have the permission to assign labels, this effectively
+requires repository owners to manually review changes first and is
+also prone to human error.</p>
+<p>Note that there is an important “gotcha” to any remediation put in
+place for a vulnerable workflow. All PRs that were opened before a fix
+was made to the vulnerable workflow will use the version of the
+workflow as it existed at the time the PR was opened. That means that
+if there is a pending PR, any updates to the PR may still abuse the
+vulnerable workflow. It is advisable to either close or rebase such
+PRs if untrusted commits may be added to them after a vulnerable
+workflow is fixed.</p>
+<p>You may ask yourself: if the pull_request_target workflow only checks
+out and builds the PR, i.e. runs untrusted code but doesn’t reference
+any secrets, is it still vulnerable?</p>
+<p>Yes it is, because a workflow triggered on pull_request_target still
+has the read/write repository token in memory that is potentially
+available to any running program. If the workflow uses
+actions/checkout and does not pass the optional parameter
+persist-credentials as false, it makes it even worse. The default for
+the parameter is true. It means that in any subsequent steps any
+running code can simply read the stored repository token from the
+disk. If you don’t need a repository write access or secrets, just
+stick to the pull_request trigger.</p>
+</blockquote>
+<p>If you still want to go that way add the <code>pull_request_target</code> trigger with <code>labeled</code> type</p>
+<pre><code>on:
+  pull_request_target:
+    types: [labeled]
+</code></pre>
+<p>Create a label via <code>Pull requests -&gt; Labels -&gt; new label</code> and apply it to the pull request from Labels section in the right side menu when you are ready to merge the PR, this will trigger the workflow.</p>
+","5168011",""
+"77010688","76952023","2023-08-30 18:34:23","6","<p>By default, all first-time contributors require approval to run workflows if they use the pull_request event. They no longer need approval for the same repository after the first contribution. The workflows will be triggered automatically. According to GitHub's official documentation, workflows for PRs against forked repos using <strong>pull_request events do not have access to the base repository secrets.</strong></p>
+<p>As a result, you will not be able to access the secrets in the workflow for PR against forked repository.
+You can obtain the secrets using pull_request_target, but a <strong><a href=""https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target:%7E:text=Warning%3A%20For,with%20this%20event."" rel=""noreferrer"">risk</a></strong> is involved. According to the official GitHub documentation, if you use pull_request_target event, you should not check out, build, or run untrusted code from the pull request. That is exactly what your workflow is doing.</p>
+<p>There is a alternative, You can have a separate workflow with event <a href=""https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#workflow_run"" rel=""noreferrer"">workflow_run</a> that will be triggered after the completion of CI pipeline. workflow_run  allows you to execute a workflow based on execution or completion of another workflow. The workflow started by the workflow_run event is able to access secrets and write tokens, even if the previous workflow was not.</p>
+<p>Still in both the cases (pull_request_target,workflow_run) there is risk associated. <strong>Please proceed with caution!</strong></p>
+<p>Hope this helps!</p>
+","8898011",""
+"77025082","77009521","2023-09-01 17:35:50","0","<p>I found out the reason from <a href=""https://github.com/kivy/buildozer/issues/1357"" rel=""nofollow noreferrer"">this question</a>, which would solve enough to change buildozer -v android debug to echo y | buildozer -v android debug.
+New file yml:</p>
+<p>name: CI</p>
+<pre><code>on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 1,15 * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get Date
+        id: get-date
+        run: |
+          echo &quot;::set-output name=date::$(/bin/date -u &quot;+%Y%m%d&quot;)&quot;
+        shell: bash
+
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v2
+        with:
+          path: .buildozer_global
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      - uses: actions/cache@v2
+        with:
+          path: .buildozer
+          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
+
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          command: echo y | buildozer -v android debug
+          buildozer_version: master
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: package
+          path: ${{ steps.buildozer.outputs.filename }}
+</code></pre>
+","22460542",""
+"77158837","77158031","2023-09-22 15:11:26","0","<p>As an alternative, please consider using the <a href=""https://github.com/dorny/paths-filter"" rel=""nofollow noreferrer"">dorny/paths-filter</a> GitHub Action that is able to &quot;Consider if file was added, modified or deleted&quot; (See the advanced option <a href=""https://github.com/dorny/paths-filter#advanced-options"" rel=""nofollow noreferrer"">here</a>) like:</p>
+<pre><code>- uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        # Changed file can be 'added', 'modified', or 'deleted'.
+        # By default, the type of change is not considered.
+        # Optionally, it's possible to specify it using nested
+        # dictionary, where the type of change composes the key.
+        # Multiple change types can be specified using `|` as the delimiter.
+        filters: |
+          shared: &amp;shared
+            - common/**
+            - config/**
+          addedOrModified:
+            - added|modified: '**'
+          allChanges:
+            - added|deleted|modified: '**'
+          addedOrModifiedAnchors:
+            - added|modified: *shared
+</code></pre>
+<p>This approach will require an extra job that will prevent the execution in case.</p>
+","2270041",""
+"77268917","77268763","2023-10-10 20:57:35","1","<p>There are two issues with your code:</p>
+<ol>
+<li><p>you do not pass the secret correctly to the action - you'll have to use <code> &quot;MY_PASSWORD=${{ secrets.MY_PASSWORD }}&quot;</code></p>
+</li>
+<li><p>You need to mount the secret on each <code>RUN</code> statement that you will try to use it.</p>
+</li>
+</ol>
+<p>Here are your fixed files:</p>
+<p>the pipeline snippet</p>
+<pre class=""lang-yaml prettyprint-override""><code>     - name: build and push base runtime image
+        uses: docker/build-push-action@v5
+        with:
+          file: path/to/Dockerfile 
+          build-args: |
+            USERNAME=${{ inputs.username }}
+          secrets: |
+            &quot;MY_PASSWORD=${{ secrets.MY_PASSWORD }}&quot;
+</code></pre>
+<p>and the Dockerfile</p>
+<pre><code>FROM ubuntu:latest
+
+ARG USERNAME
+
+COPY ./test-script.sh .
+
+RUN --mount=type=secret,id=MY_PASSWORD \
+  cat /run/secrets/MY_PASSWORD
+
+RUN --mount=type=secret,id=MY_PASSWORD \
+  ./test-script.sh ${USERNAME} $(cat /run/secrets/MY_PASSWORD)
+</code></pre>
+","3248158",""
+"77395417","77395114","2023-10-31 11:17:29","3","<p>You have a <code>gh-action-test</code> <strong>directory</strong> in which there is a <code>gh-action-test</code> file, that's what the <code>d</code> in <code>dr-xr-xr-x</code> stands for. The <code>ls -l .</code> command shows the <code>gh-action-test</code> directory which is inside the current directory. The <code>ls -l gh-action-test</code> command shows the <code>gh-action-test/gh-action-test</code> file.</p>
+<p>If you do <code>ls -ld gh-action-test</code>, you should see the same permissions as in <code>ls -l .</code></p>
+","5397009",""
+"77446960","77446605","2023-11-08 15:34:04","3","<p>You need to install the dependencies in your action in order for it to work. Adding <code>poetry install</code> after your pip statement is an immediate fix, but there are some further tweaks you should make.</p>
+<p>Your project needs to be tweaked for pytest to pick up your tests.
+pytest requires that your files be prefixed with <code>test_</code>, and all test classes should start with <code>Test</code>.</p>
+<p>You should have poetry manage pytest and pylint as dev dependencies so that they are installed within the venv only when you include them in your github actions (and locally) by running <code>poetry install --with dev</code>:</p>
+<pre><code># in pyproject.toml
+[tool.poetry.group.dev.dependencies]
+pytest = &quot;^7.4.3&quot;
+pylint = &quot;^3.0.2&quot;
+</code></pre>
+<p>You'll also want to include the current directory in your pythonpath for pytest:</p>
+<pre><code># in pyproject.toml
+[tool.pytest.ini_options]
+pythonpath = [
+  &quot;.&quot;
+]
+</code></pre>
+<p>You'll also want to add an init-hook for pylint to handle imports correctly while in the venv:</p>
+<pre><code>[MASTER]
+init-hook='import sys; sys.path.append(&quot;.&quot;)'
+# ...
+</code></pre>
+<p>From there, you can just use poetry to manage both pytest and pylint.</p>
+<pre><code># snippet of test.yml
+# ...
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install --with dev
+
+    - name: Run tests
+      run: poetry run pytest
+
+    - name: Lint
+      run: poetry run pylint $(git ls-files '*.py')
+</code></pre>
+","6106614",""
+"77520793","77519735","2023-11-21 06:42:33","3","<p>I deleted the following code from my <code>package.json</code>.</p>
+<p>And all code works normal.</p>
+<pre class=""lang-js prettyprint-override""><code>&quot;packageManager&quot;: &quot;yarn@3.6.1&quot; &lt;--- remove
+</code></pre>
+<p>I don't know the exact reason.</p>
+<p>It is necessary to confirm that checking in <code>Github Actions's policy</code> has changed.</p>
+<p>Please let me know if there is a more certain way. thank you</p>
+","20892191",""
+"77818136","77519735","2024-01-15 07:09:22","0","<p>I think issue is with npm version . try  using v20.10.0</p>
+","12661223",""
+"77941440","77519735","2024-02-05 13:51:49","0","<p>So the reason is that yarn has changed how the cli works, we used to install it with <code>npm install -g yarn</code>, but they are now moving away from this approach, meaning each project would have its own yarn and yarn version. Checkout <a href=""https://yarnpkg.com/corepack"" rel=""nofollow noreferrer"">https://yarnpkg.com/corepack</a>,</p>
+<p>So, to fix this, either follow the steps on the link to enable corepack, or alternatively, if you disagree with them, just remove the key and value <code>&quot;packageManager&quot;</code> inside the project's <code>package.json</code></p>
+","9907360",""
