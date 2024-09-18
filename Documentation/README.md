@@ -85,4 +85,4 @@ Alternatively, if you are using Conda, you can use environment.yml to set up the
 - The taxonomy developed for RQ2, along with the evaluation metrics, is available in the RQ2_Taxonomy/evaluation/ folder.
 
 ## Contact
-If you have any questions or run into any issues, feel free to contact the project authors at sandrohernandezgoicochea@gmail.com
+If you have any questions or run into any issues, feel free to contact the project authors at
