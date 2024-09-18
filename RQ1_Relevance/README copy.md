@@ -1,14 +1,23 @@
-### Step 1: **Defining the Metrics**
+# Analysis of GitHub Actions' Relevance and Difficulty
 
-To assess the growing interest in GitHub Actions (GA), we use two key metrics:
+## Monthly Number of Posts
 
-1. **Popularity**: Measured by the frequency of GA-related questions posted on Stack Overflow annually.
-2. **Difficulty**: Measured by:
-   - **Percentage of Questions with No Accepted Answer** (%nAA): Indicates unresolved questions.
-   - **Response Time** (RT): Measures the time taken to receive an accepted answer.
+Para evaluar la relevancia de GitHub Actions (GHA) en comparación con otras herramientas de CI/CD, primero examinamos el número mensual de publicaciones relacionadas con cada herramienta en Stack Overflow. Los datos, extraídos de SEDE (Stack Exchange Data Explorer), abarcan desde 2019 hasta el 3 de agosto de 2024, utilizando los principales tags de las seis herramientas más populares de CI/CD. **Figura 1** a continuación ilustra las tendencias mensuales de publicaciones desde 2019 hasta el mes completo más reciente, julio de 2024.
+
+![Monthly number of posts](figs/ci_tools_until_jul_2024.png)
 
 
-### Step 2: **Data Collection**
+## Yearly Data Overview
+
+To further investigate, we compiled the data into **Table 1**, which includes the number of questions, the percentage of non-accepted answers (%nAA), and the average response time (RT) for each tool by year.
+
+### Definitions:
+- **%nAA (Percentage of Non-Accepted Answers)**: This metric represents the percentage of questions that did not receive an accepted answer. It is calculated by dividing the number of questions without an accepted answer by the total number of questions in a given year.
+  
+- **RT (Average Response Time)**: This metric indicates the average time taken to receive a response from when a question is posted. It is calculated by averaging the time in days between the creation of the question and the accepted answer. Questions that they do not have an accepted answer will not be considered in this calculation.
+
+Notice, that by the time this study was done, year 2024 was not finished.
+
 
 #### **Table 1: Data for Various CI/CD Tools (2019-2023)**
 
@@ -52,81 +61,64 @@ To assess the growing interest in GitHub Actions (GA), we use two key metrics:
 | 2024 | travis-ci      | 7                   | 57.14%                                                | 0.35                              |
 
 
----
+## Trends in %nAA and RT Over Time
 
-### Step 3: **Calculating Popularity**
+**Figure 3** shows the evolution of the percentage of non-accepted answers (%nAA) and the average response time (RT) for GitHub Actions and other CI/CD tools over time.
 
-#### **Table 2: Number of Questions per Year for Each Tool**
+![Fig 3: Evolution of %nAA and RT for Each Tool Over Time](figs/nAA_RT_vs_time_each_tool.png)
 
-| Year | GitHub Actions | Jenkins | CircleCI | Travis CI |
-|------|----------------|---------|----------|-----------|
-| 2019 | 200            | 300     | 150      | 180       |
-| 2020 | 350            | 320     | 160      | 190       |
-| 2021 | 500            | 340     | 170      | 200       |
-| 2022 | 700            | 350     | 180      | 210       |
-| 2023 | 900            | 370     | 190      | 220       |
+### Interpretation of Trends
 
-#### **Graph 1: Line Graph of Number of Questions Over Time**
+From **Figure 4** and **Figure 5**, which provide alternative visualizations, it is evident that for GitHub Actions, the %nAA has consistently increased over time, while the RT has decreased. This suggests that while GitHub Actions is becoming more popular, it is also becoming more difficult for the community to provide accepted answers, as reflected in the increasing %nAA. Conversely, the decreasing RT indicates that answers are being provided more quickly, even if they are not always accepted.
 
-- **Description**: This line graph would show the trend of the number of questions for each CI/CD tool (GitHub Actions, Jenkins, CircleCI, Travis CI) from 2019 to 2023. Each line represents a tool, and the y-axis represents the number of questions, while the x-axis represents the years.
-- **Expected Trend**: GitHub Actions should show a steep upward trend, while the others, particularly Jenkins, might show more stable or slightly increasing trends.
+![Fig 4: Evolution of %nAA and RT for Each Tool Over Time](figs/nAA_RT_vs_time.png)
 
----
-
-### Step 4: **Assessing Difficulty**
-
-#### **Table 3: Percentage of Questions with No Accepted Answer (%nAA) per Year**
-
-| Year | GitHub Actions | Jenkins | CircleCI | Travis CI |
-|------|----------------|---------|----------|-----------|
-| 2019 | 20%            | 18%     | 25%      | 22%       |
-| 2020 | 22%            | 17%     | 24%      | 21%       |
-| 2021 | 21%            | 16%     | 23%      | 20%       |
-| 2022 | 23%            | 15%     | 22%      | 19%       |
-| 2023 | 24%            | 14%     | 21%      | 18%       |
-
-#### **Graph 2: Bar Graph of %nAA Over Time**
-
-- **Description**: This bar graph would compare the %nAA for each tool across different years. Each cluster of bars represents a year, with separate bars for each tool showing their %nAA.
-- **Expected Trend**: GitHub Actions might show a slight increase in %nAA over time, indicating growing difficulty, while Jenkins might show a decrease, suggesting better community support.
-
-#### **Table 4: Response Time (RT) per Year**
-
-| Year | GitHub Actions | Jenkins | CircleCI | Travis CI |
-|------|----------------|---------|----------|-----------|
-| 2019 | 2.5            | 2.2     | 3.0      | 2.7       |
-| 2020 | 2.7            | 2.3     | 3.1      | 2.8       |
-| 2021 | 2.6            | 2.1     | 2.9      | 2.6       |
-| 2022 | 2.8            | 2.0     | 2.7      | 2.5       |
-| 2023 | 2.9            | 1.9     | 2.6      | 2.4       |
-
-#### **Graph 3: Line Graph of Response Time (RT) Over Time**
-
-- **Description**: This line graph would show the RT for each tool over the years. Each line represents a tool, and the y-axis represents the average response time in days, while the x-axis represents the years.
-- **Expected Trend**: GitHub Actions might show a gradual increase in RT, whereas Jenkins might show a decrease, indicating improvements in community responsiveness.
-
----
-
-### Step 5: **Detailed Comparison and Analysis**
-
-#### **Table 5: Summary of Average Number of Questions, %nAA, and RT Changes (2019-2023)**
-
-| Tool           | Average Number of Questions | %nAA Change (2019-2023) | RT Change (Days, 2019-2023) |
-|----------------|----------------------------|--------------------------|-----------------------------|
-| GitHub Actions | 530                        | +4%                       | +0.4                        |
-| Jenkins        | 336                        | -4%                       | -0.3                        |
-| CircleCI       | 170                        | -4%                       | -0.4                        |
-| Travis CI      | 200                        | -4%                       | -0.3                        |
-
-#### **Graph 4: Combined Line and Bar Graph**
-
-- **Description**: A combined graph where the line shows the trend in the number of questions (popularity) for GitHub Actions, and the bars show the %nAA or RT. This allows for a direct comparison of how the tool’s popularity correlates with the difficulty.
-- **Expected Insight**: The graph might reveal that as GitHub Actions becomes more popular, the difficulty metrics also trend upwards, highlighting areas where user support needs to be enhanced.
-
-#### **Graph 5: Scatter Plot of Popularity vs. Difficulty**
-
-- **Description**: A scatter plot that visualizes the correlation between the number of questions (popularity) and %nAA or RT (difficulty) for GitHub Actions. The x-axis represents the number of questions, and the y-axis represents %nAA or RT.
-- **Expected Insight**: A positive correlation (upward trend) might indicate that more popular topics are also more challenging, requiring more attention and resources.
+![Fig 5: Evolution of %nAA and RT for Each Tool Over Time](figs/nAA_RT_vs_time_gha.png)
 
 
+### Correlation Between Popularity and Difficulty
 
+**Table 2** and **Table 3** explore the correlation between %nAA and popularity (measured by the number of questions), as well as RT and popularity.
+
+**Table 2: Correlation between %nAA and Popularity**
+
+| Tool           | Correlation (%nAA vs Popularity) |
+|----------------|----------------------------------|
+| azure-devops   | -0.884598                        |
+| circleci       | -0.701330                        |
+| github-actions | 0.971624                         |
+| gitlab-ci      | -0.270068                        |
+| jenkins        | -0.875577                        |
+| travis-ci      | -0.897390                        |
+
+**Table 3: Correlation between RT and Popularity**
+
+| Tool           | Correlation (RT vs Popularity) |
+|----------------|--------------------------------|
+| azure-devops   | 0.487261                       |
+| circleci       | 0.006772                       |
+| github-actions | -0.977778                      |
+| gitlab-ci      | -0.461482                      |
+| jenkins        | 0.880743                       |
+| travis-ci      | 0.941690                       |
+
+**Overall Correlations**:
+
+Overall Correlation (%nAA vs Popularity): -0.17 Overall Correlation (RT vs Popularity): -0.15
+
+
+## Correlation between %nAA and RT
+
+Correlation measures the strength and direction of a linear relationship between two variables. Below, **Table 4** presents the correlation between %nAA and RT for each tool, highlighting the overall trend across all tools.
+
+**Table 4: Correlation (%nAA vs RT)**
+
+| Tool         | Correlation (%nAA vs RT) |
+|--------------|--------------------------|
+| azure-devops | -0.615948                 |
+| circleci     | -0.100888                 |
+| github-actions | -0.984399               |
+| gitlab-ci    | -0.690472                 |
+| jenkins      | -0.964885                 |
+| travis-ci    | -0.701523                 |
+| Overall      | -0.445850                 |
