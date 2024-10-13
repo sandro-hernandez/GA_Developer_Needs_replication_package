@@ -11,7 +11,6 @@ The analysis includes building a taxonomy of Developer Information Needs (DN), f
 - **answers_data/**: This folder contains the data related to answers and posts from Stack Overflow that were used for the analysis.
 - **data/raw_data/**: Raw data extracted from Stack Overflow posts.
 - **data/processed_data/**: Cleaned and pre-processed data used for generating the taxonomy.
-- **evaluation/**: Results from the evaluation of the taxonomy, including metrics like classification accuracy, F1-scores, and inter-annotator agreement.
 - **results/**: Final results, such as the taxonomy itself and any accompanying figures or tables.
 - **scripts/**: Jupyter notebook used to perform the taxonomy analysis.
 
@@ -43,9 +42,7 @@ jupyter notebook taxonomy.ipynb
 - Loading the raw and processed data from the `data/` folder.
 - Categorizing developer information needs into different classes based on the posts and sentences from Stack Overflow.
 - Building the final taxonomy of Developer Information Needs.
-- Evaluating the taxonomy through metrics like accuracy, F1-scores, and inter-annotator agreement.
-- Storing the results in the `results/` folder and evaluation metrics in the `evaluation/` folder.
-- Review the Results: After running the notebook, review the taxonomy results stored in the `results/` folder and the evaluation outputs stored in the `evaluation/` folder.
+- Review the Results: After running the notebook, review the taxonomy results stored in the `results/` folder 
 
 ### Data
 - **Raw Data** : The raw Stack Overflow data used for the taxonomy analysis is stored in `data/raw_data/`. This includes CSV files containing relevant posts and metadata.
@@ -53,4 +50,3 @@ jupyter notebook taxonomy.ipynb
 
 ### Results
 - **Taxonomy**: The final taxonomy of Developer Information Needs is stored in the `results/` folder, including the categorization of posts and sentences.
-- **Evaluation Metrics**: The `evaluation/` folder contains metrics evaluating the taxonomy, such as classification accuracy, precision, recall, F1-score, and inter-annotator agreement.
