@@ -19,8 +19,6 @@ The repository is organized to allow replication and further exploration of all 
 
 ```bash
 .
-├── Documentation
-│   └── paper/                    # Contains the paper draft and additional references
 ├── RQ1_Relevance                 # Folder containing all materials related to RQ1
 │   ├── data/
 │   │   ├── raw_data/             # Raw data related to RQ1
